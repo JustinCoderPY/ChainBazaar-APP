@@ -1,21 +1,21 @@
-import React, { useState, useEffect } from 'react';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import React, { useEffect, useState } from 'react';
 import {
-  View,
-  Text,
-  Image,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
-  Alert,
-  Share,
-  SafeAreaView,
-  Dimensions,
+    Alert,
+    Dimensions,
+    Image,
+    SafeAreaView,
+    ScrollView,
+    Share,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
 } from 'react-native';
-import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Colors } from '../../constants/Colors';
-import { Product } from '../../types';
-import { getProducts, saveProducts } from '../../services/storage';
 import { getCryptoPrices } from '../../services/coinGeckoApi';
+import { deleteListing, getAllListings } from '../../services/firebaseService';
+import { Product } from '../../types';
 
 const { width } = Dimensions.get('window');
 
@@ -33,10 +33,16 @@ export default function ProductDetailsScreen() {
   }, [id]);
 
   const loadProduct = async () => {
-    const products = await getProducts();
-    const found = products.find(p => p.id === id);
-    if (found) {
-      setProduct(found);
+    try {
+      console.log('Loading product from Firebase...');
+      const products = await getAllListings();
+      const found = products.find(p => p.id === id);
+      if (found) {
+        setProduct(found);
+        console.log('Product loaded:', found.title);
+      }
+    } catch (error) {
+      console.error('Error loading product:', error);
     }
   };
 
@@ -58,11 +64,15 @@ export default function ProductDetailsScreen() {
           text: 'Delete',
           style: 'destructive',
           onPress: async () => {
-            const products = await getProducts();
-            const filtered = products.filter(p => p.id !== id);
-            await saveProducts(filtered);
-            Alert.alert('Success', 'Listing deleted successfully');
-            router.back();
+            try {
+              console.log('Deleting listing from Firebase...');
+              await deleteListing(id as string);
+              Alert.alert('Success', 'Listing deleted successfully');
+              router.back();
+            } catch (error) {
+              console.error('Error deleting listing:', error);
+              Alert.alert('Error', 'Failed to delete listing');
+            }
           },
         },
       ]
@@ -102,7 +112,6 @@ export default function ProductDetailsScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView>
-        {/* Header with Back Button */}
         <View style={styles.header}>
           <TouchableOpacity 
             style={styles.backButton}
@@ -112,7 +121,6 @@ export default function ProductDetailsScreen() {
           </TouchableOpacity>
         </View>
 
-        {/* Image Gallery */}
         <ScrollView 
           horizontal 
           pagingEnabled
@@ -132,7 +140,6 @@ export default function ProductDetailsScreen() {
           ))}
         </ScrollView>
 
-        {/* Image Indicator */}
         {images.length > 1 && (
           <View style={styles.imageIndicator}>
             {images.map((_, index) => (
@@ -147,7 +154,6 @@ export default function ProductDetailsScreen() {
           </View>
         )}
 
-        {/* Product Info */}
         <View style={styles.content}>
           <View style={styles.categoryBadge}>
             <Text style={styles.categoryText}>{product.category}</Text>
@@ -178,7 +184,6 @@ export default function ProductDetailsScreen() {
         </View>
       </ScrollView>
 
-      {/* Action Buttons Footer */}
       <View style={styles.footer}>
         <TouchableOpacity 
           style={styles.shareButton}

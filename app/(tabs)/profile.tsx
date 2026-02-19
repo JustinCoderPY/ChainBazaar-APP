@@ -1,8 +1,10 @@
-import { useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
   Alert,
+  Dimensions,
   FlatList,
+  Image,
   RefreshControl,
   SafeAreaView,
   StyleSheet,
@@ -10,12 +12,14 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import ProductCard from '../../components/ProductCard';
 import { Colors } from '../../constants/Colors';
 import { getCryptoPrices } from '../../services/coinGeckoApi';
-import { getProducts } from '../../services/storage';
+import { getUserListings } from '../../services/firebaseService';
 import { Product } from '../../types';
 import { useAuth } from '../AuthContext';
+
+const { width } = Dimensions.get('window');
+const CARD_WIDTH = (width - 48) / 2;
 
 export default function ProfileScreen() {
   const { user, logout, isGuest } = useAuth();
@@ -24,6 +28,14 @@ export default function ProfileScreen() {
   const [btcPrice, setBtcPrice] = useState(50000);
   const [ethPrice, setEthPrice] = useState(3000);
   const [refreshing, setRefreshing] = useState(false);
+
+  useFocusEffect(
+    React.useCallback(() => {
+      if (user) {
+        loadMyListings();
+      }
+    }, [user])
+  );
 
   useEffect(() => {
     if (user) {
@@ -34,15 +46,21 @@ export default function ProfileScreen() {
   const loadMyListings = async () => {
     if (!user) return;
     
-    const allProducts = await getProducts();
-    const userProducts = allProducts.filter(p => p.sellerId === user.id);
-    setMyListings(userProducts);
+    try {
+      console.log('Loading user listings from Firebase...');
+      // Load user's listings from Firebase
+      const userProducts = await getUserListings(user.id);
+      console.log(`Loaded ${userProducts.length} listings for user`);
+      setMyListings(userProducts);
 
-    // Load crypto prices
-    const prices = await getCryptoPrices();
-    if (prices) {
-      setBtcPrice(prices.bitcoin.usd);
-      setEthPrice(prices.ethereum.usd);
+      // Load crypto prices
+      const prices = await getCryptoPrices();
+      if (prices) {
+        setBtcPrice(prices.bitcoin.usd);
+        setEthPrice(prices.ethereum.usd);
+      }
+    } catch (error) {
+      console.error('Error loading listings:', error);
     }
   };
 
@@ -89,6 +107,31 @@ export default function ProfileScreen() {
     );
   }
 
+  const renderGridItem = ({ item }: { item: Product }) => {
+    const imageUrl = item.imageUrls && item.imageUrls.length > 0
+      ? item.imageUrls[0]
+      : 'https://picsum.photos/300';
+
+    return (
+      <TouchableOpacity 
+        style={styles.gridCard}
+        onPress={() => router.push(`/product/${item.id}`)}
+      >
+        <Image 
+          source={{ uri: imageUrl }} 
+          style={styles.gridImage}
+          resizeMode="cover"
+        />
+        <View style={styles.gridInfo}>
+          <Text style={styles.gridTitle} numberOfLines={2}>
+            {item.title}
+          </Text>
+          <Text style={styles.gridPrice}>${item.price.toFixed(2)}</Text>
+        </View>
+      </TouchableOpacity>
+    );
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
@@ -125,17 +168,10 @@ export default function ProfileScreen() {
       <FlatList
         data={myListings}
         keyExtractor={(item) => item.id}
-        renderItem={({ item }) => (
-          <ProductCard
-            product={item}
-            btcPrice={btcPrice}
-            ethPrice={ethPrice}
-            onPress={() => {
-              router.push(`/product/${item.id}`);
-            }}
-          />
-        )}
-        contentContainerStyle={styles.list}
+        renderItem={renderGridItem}
+        numColumns={2}
+        columnWrapperStyle={styles.gridRow}
+        contentContainerStyle={styles.gridList}
         refreshControl={
           <RefreshControl 
             refreshing={refreshing} 
@@ -153,6 +189,7 @@ export default function ProfileScreen() {
   );
 }
 
+// ... (keep all the existing styles)
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -251,13 +288,48 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: Colors.secondary,
     padding: 16,
+    paddingBottom: 8,
   },
-  list: {
-    padding: 16,
+  gridList: {
+    paddingHorizontal: 16,
+    paddingBottom: 16,
+  },
+  gridRow: {
+    justifyContent: 'space-between',
+    marginBottom: 16,
+  },
+  gridCard: {
+    width: CARD_WIDTH,
+    backgroundColor: Colors.gray,
+    borderRadius: 12,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: '#333',
+  },
+  gridImage: {
+    width: '100%',
+    aspectRatio: 1,
+    backgroundColor: Colors.gray,
+  },
+  gridInfo: {
+    padding: 12,
+  },
+  gridTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: Colors.secondary,
+    marginBottom: 6,
+    minHeight: 36,
+  },
+  gridPrice: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: Colors.success,
   },
   emptyContainer: {
     alignItems: 'center',
     marginTop: 40,
+    width: '100%',
   },
   emptyText: {
     fontSize: 16,

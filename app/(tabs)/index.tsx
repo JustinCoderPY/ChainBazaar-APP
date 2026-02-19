@@ -1,22 +1,22 @@
-import { useRouter } from 'expo-router';
-import React, { useEffect, useState } from 'react';
-import {
-  Alert,
-  FlatList,
+import React, { useState, useEffect } from 'react';
+import { 
+  View, 
+  Text, 
+  FlatList, 
+  StyleSheet, 
+  TextInput,
   RefreshControl,
   SafeAreaView,
-  StyleSheet,
-  Text,
-  TextInput,
   TouchableOpacity,
-  View,
+  Alert,
 } from 'react-native';
-import CryptoHeader from '../../components/CryptoHeader';
-import ProductCard from '../../components/ProductCard';
+import { useRouter } from 'expo-router';
 import { Colors } from '../../constants/Colors';
-import { getCryptoPrices } from '../../services/coinGeckoApi';
-import { getProducts } from '../../services/storage';
 import { Product } from '../../types';
+import { getAllListings } from '../../services/firebaseService';
+import { getCryptoPrices } from '../../services/coinGeckoApi';
+import ProductCard from '../../components/ProductCard';
+import CryptoHeader from '../../components/CryptoHeader';
 import { useAuth } from '../AuthContext';
 
 export default function HomeScreen() {
@@ -25,7 +25,7 @@ export default function HomeScreen() {
   const [btcPrice, setBtcPrice] = useState(50000);
   const [ethPrice, setEthPrice] = useState(3000);
   const [refreshing, setRefreshing] = useState(false);
-  const { isGuest } = useAuth();
+  const { isGuest, user } = useAuth();
   const router = useRouter();
 
   useEffect(() => {
@@ -33,13 +33,21 @@ export default function HomeScreen() {
   }, []);
 
   const loadData = async () => {
-    const storedProducts = await getProducts();
-    setProducts(storedProducts);
+    try {
+      // Load products from Firebase
+      console.log('Loading listings from Firebase...');
+      const firebaseProducts = await getAllListings();
+      console.log(`Loaded ${firebaseProducts.length} listings`);
+      setProducts(firebaseProducts);
 
-    const prices = await getCryptoPrices();
-    if (prices) {
-      setBtcPrice(prices.bitcoin.usd);
-      setEthPrice(prices.ethereum.usd);
+      // Load crypto prices
+      const prices = await getCryptoPrices();
+      if (prices) {
+        setBtcPrice(prices.bitcoin.usd);
+        setEthPrice(prices.ethereum.usd);
+      }
+    } catch (error) {
+      console.error('Error loading data:', error);
     }
   };
 
@@ -60,7 +68,7 @@ export default function HomeScreen() {
         ]
       );
     } else {
-      router.push('/create');
+      router.push('/(tabs)/create');
     }
   };
 
@@ -73,9 +81,26 @@ export default function HomeScreen() {
     <SafeAreaView style={styles.container}>
       <CryptoHeader />
       
+      {/* HEADER WITH PROFILE ICON */}
       <View style={styles.header}>
-        <Text style={styles.title}>ChainBazaar</Text>
-        <Text style={styles.subtitle}>Buy & Sell with Crypto Prices</Text>
+        <View style={styles.headerContent}>
+          <View>
+            <Text style={styles.title}>ChainBazaar</Text>
+            <Text style={styles.subtitle}>Buy & Sell with Crypto Prices</Text>
+          </View>
+          
+          {/* PROFILE ICON BUTTON */}
+          <TouchableOpacity 
+            style={styles.profileButton}
+            onPress={() => router.push('/(tabs)/profile')}
+          >
+            <View style={styles.profileIcon}>
+              <Text style={styles.profileIconText}>
+                {isGuest ? '?' : user?.name?.charAt(0).toUpperCase()}
+              </Text>
+            </View>
+          </TouchableOpacity>
+        </View>
       </View>
 
       <View style={styles.searchContainer}>
@@ -96,7 +121,7 @@ export default function HomeScreen() {
             product={item}
             btcPrice={btcPrice}
             ethPrice={ethPrice}
-            onPress={() => router.push(`/product/${item.id}`)} // CHANGED: Navigate to details
+            onPress={() => router.push(`/product/${item.id}`)}
           />
         )}
         contentContainerStyle={styles.list}
@@ -129,7 +154,12 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.primary,
   },
   header: {
-    padding: 20,
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+  },
+  headerContent: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
   },
   title: {
@@ -141,6 +171,24 @@ const styles = StyleSheet.create({
   subtitle: {
     fontSize: 14,
     color: Colors.lightGray,
+  },
+  profileButton: {
+    padding: 4,
+  },
+  profileIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: Colors.accent,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: Colors.success,
+  },
+  profileIconText: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: Colors.secondary,
   },
   searchContainer: {
     paddingHorizontal: 16,

@@ -1,22 +1,22 @@
+import * as ImagePicker from 'expo-image-picker';
+import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import {
-  View,
-  Text,
-  TextInput,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
-  Image,
-  Alert,
-  SafeAreaView,
-  KeyboardAvoidingView,
-  Platform,
+    Alert,
+    Image,
+    KeyboardAvoidingView,
+    Platform,
+    SafeAreaView,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View,
 } from 'react-native';
-import { useRouter } from 'expo-router';
-import * as ImagePicker from 'expo-image-picker';
 import { Colors } from '../../constants/Colors';
-import { Product } from '../../types';
 import { addProduct } from '../../services/storage';
+import { Product } from '../../types';
 import { useAuth } from '../AuthContext';
 
 const CATEGORIES = ['Electronics', 'Clothing', 'Home', 'Sports', 'Books', 'Other'];
@@ -92,30 +92,46 @@ export default function CreateListingScreen() {
     setLoading(true);
 
     try {
+      // Since we're using local storage, we'll skip Firebase image upload
+      // and use placeholder or local image URIs
+      console.log('Creating listing with images...');
+      const uploadedImageUrls = images; // Use image URIs directly
+
+      // Create product object
       const newProduct: Product = {
-        id: Date.now().toString(),
+        id: `product_${Date.now()}`,
         title: title.trim(),
         description: description.trim(),
         price: parseFloat(price),
         category,
-        imageUrls: images,
+        imageUrls: uploadedImageUrls,
         sellerId: user?.id || 'guest',
         sellerName: user?.name || 'Guest User',
         createdAt: new Date().toISOString(),
       };
 
+      // Save to local storage
+      console.log('Saving listing to storage...');
       await addProduct(newProduct);
+      console.log('Listing saved successfully!');
 
-      Alert.alert('Success!', 'Your listing has been created', [
+      Alert.alert('Success!', 'Your listing has been created! 🎉', [
         {
           text: 'OK',
           onPress: () => {
+            // Reset form
+            setTitle('');
+            setDescription('');
+            setPrice('');
+            setImages([]);
+            setCategory('Electronics');
             router.back();
           },
         },
       ]);
     } catch (error) {
-      Alert.alert('Error', 'Failed to create listing');
+      console.error('Error creating listing:', error);
+      Alert.alert('Error', 'Failed to create listing. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -234,7 +250,7 @@ export default function CreateListingScreen() {
               disabled={loading}
             >
               <Text style={styles.submitButtonText}>
-                {loading ? 'Creating...' : '🚀 Create Listing'}
+                {loading ? 'Uploading...' : '🚀 Create Listing'}
               </Text>
             </TouchableOpacity>
           </View>
