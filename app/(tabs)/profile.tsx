@@ -1,21 +1,21 @@
-import React, { useState, useEffect } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  SafeAreaView,
-  FlatList,
-  Alert,
-  RefreshControl,
-} from 'react-native';
 import { useRouter } from 'expo-router';
+import React, { useEffect, useState } from 'react';
+import {
+  Alert,
+  FlatList,
+  RefreshControl,
+  SafeAreaView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native';
+import ProductCard from '../../components/ProductCard';
 import { Colors } from '../../constants/Colors';
-import { useAuth } from '../AuthContext';
+import { getCryptoPrices } from '../../services/coinGeckoApi';
 import { getProducts } from '../../services/storage';
 import { Product } from '../../types';
-import ProductCard from '../../components/ProductCard';
-import { getCryptoPrices } from '../../services/coinGeckoApi';
+import { useAuth } from '../AuthContext';
 
 export default function ProfileScreen() {
   const { user, logout, isGuest } = useAuth();
@@ -131,8 +131,7 @@ export default function ProfileScreen() {
             btcPrice={btcPrice}
             ethPrice={ethPrice}
             onPress={() => {
-              // TODO: Navigate to product details
-              console.log('Product pressed:', item.id);
+              router.push(`/product/${item.id}`);
             }}
           />
         )}

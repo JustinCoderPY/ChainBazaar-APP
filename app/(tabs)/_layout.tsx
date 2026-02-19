@@ -1,44 +1,30 @@
-import { Tabs } from 'expo-router';
-import { Text } from 'react-native';
-import { Colors } from '../../constants/Colors';
+import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
+import { Stack } from 'expo-router';
+import { StatusBar } from 'expo-status-bar';
+import 'react-native-reanimated';
 
-export default function TabLayout() {
+import { useColorScheme } from '@/hooks/use-color-scheme';
+import { AuthProvider } from '../AuthContext';
+
+export const unstable_settings = {
+  anchor: '(tabs)',
+};
+
+export default function RootLayout() {
+  const colorScheme = useColorScheme();
+
   return (
-    <Tabs
-      screenOptions={{
-        tabBarActiveTintColor: Colors.success,
-        tabBarInactiveTintColor: Colors.lightGray,
-        tabBarStyle: {
-          backgroundColor: Colors.primary,
-          borderTopColor: '#333',
-        },
-        headerStyle: {
-          backgroundColor: Colors.primary,
-        },
-        headerTintColor: Colors.secondary,
-      }}
-    >
-      <Tabs.Screen
-        name="index"
-        options={{
-          title: 'Browse',
-          tabBarIcon: ({ color }) => <Text style={{ fontSize: 24 }}>🏪</Text>,
-        }}
-      />
-      <Tabs.Screen
-        name="create"
-        options={{
-          title: 'Create Listing',
-          tabBarIcon: ({ color }) => <Text style={{ fontSize: 24 }}>➕</Text>,
-        }}
-      />
-      <Tabs.Screen
-        name="profile"
-        options={{
-          title: 'Profile',
-          tabBarIcon: ({ color }) => <Text style={{ fontSize: 24 }}>👤</Text>,
-        }}
-      />
-    </Tabs>
+    <AuthProvider>
+      <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
+        <Stack>
+          <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+          <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
+          <Stack.Screen name="auth/login" options={{ presentation: 'modal', title: 'Login' }} />
+          <Stack.Screen name="auth/signup" options={{ presentation: 'modal', title: 'Sign Up' }} />
+          <Stack.Screen name="product/[id]" options={{ headerShown: false }} />
+        </Stack>
+        <StatusBar style="auto" />
+      </ThemeProvider>
+    </AuthProvider>
   );
 }
