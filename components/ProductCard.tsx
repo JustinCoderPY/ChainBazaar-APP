@@ -1,7 +1,15 @@
 import React from 'react';
-import { View, Text, Image, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, Text, Image, StyleSheet } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { Product } from '../types';
-import { Colors } from '../constants/Colors';
+import {
+  AppColors,
+  Spacing,
+  Radii,
+  Shadows,
+  Typography,
+} from '../constants/theme';
+import AnimatedPressable from './AnimatedPressable';
 
 interface Props {
   product: Product;
@@ -10,104 +18,238 @@ interface Props {
   onPress: () => void;
 }
 
-export default function ProductCard({ product, btcPrice, ethPrice, onPress }: Props) {
+export default function ProductCard({
+  product,
+  btcPrice,
+  ethPrice,
+  onPress,
+}: Props) {
   const btcAmount = (product.price / btcPrice).toFixed(6);
-  const ethAmount = (product.price / ethPrice).toFixed(6);
+  const ethAmount = (product.price / ethPrice).toFixed(4);
 
-  // Use first image or placeholder
-  const imageUrl = product.imageUrls && product.imageUrls.length > 0 
-    ? product.imageUrls[0] 
-    : 'https://picsum.photos/300';
+  const imageUrl =
+    product.imageUrls && product.imageUrls.length > 0
+      ? product.imageUrls[0]
+      : 'https://picsum.photos/300';
 
   return (
-    <TouchableOpacity style={styles.card} onPress={onPress}>
-      <Image 
-        source={{ uri: imageUrl }} 
-        style={styles.image}
-      />
-      {product.imageUrls && product.imageUrls.length > 1 && (
-        <View style={styles.imageBadge}>
-          <Text style={styles.imageBadgeText}>+{product.imageUrls.length - 1}</Text>
+    <AnimatedPressable
+      style={styles.card}
+      onPress={onPress}
+      scaleValue={0.975}
+    >
+      {/* ── Image ──────────────────────────────────────────── */}
+      <View style={styles.imageWrapper}>
+        <Image
+          source={{ uri: imageUrl }}
+          style={styles.image}
+          resizeMode="cover"
+        />
+
+        {/* Image count badge */}
+        {product.imageUrls && product.imageUrls.length > 1 && (
+          <View style={styles.imageBadge}>
+            <Ionicons name="images-outline" size={11} color={AppColors.secondary} />
+            <Text style={styles.imageBadgeText}>
+              {product.imageUrls.length}
+            </Text>
+          </View>
+        )}
+
+        {/* Category pill */}
+        <View style={styles.categoryPill}>
+          <Text style={styles.categoryText}>{product.category}</Text>
         </View>
-      )}
+
+        {/* Bottom gradient overlay for text readability */}
+        <View style={styles.imageGradient} />
+      </View>
+
+      {/* ── Content ────────────────────────────────────────── */}
       <View style={styles.content}>
+        {/* Title */}
         <Text style={styles.title} numberOfLines={1}>
           {product.title}
         </Text>
-        <Text style={styles.category}>{product.category}</Text>
-        
-        <View style={styles.priceContainer}>
-          <Text style={styles.usdPrice}>${product.price.toFixed(2)}</Text>
-          <Text style={styles.cryptoPrice}>
-            ₿ {btcAmount} | Ξ {ethAmount}
+
+        {/* Price row */}
+        <View style={styles.priceRow}>
+          <Text style={styles.usdPrice}>
+            ${product.price.toLocaleString(undefined, {
+              minimumFractionDigits: 2,
+              maximumFractionDigits: 2,
+            })}
           </Text>
+          <View style={styles.cryptoContainer}>
+            <View style={styles.cryptoItem}>
+              <View style={[styles.cryptoDot, { backgroundColor: AppColors.btcOrange }]} />
+              <Text style={styles.cryptoText}>{btcAmount} BTC</Text>
+            </View>
+            <View style={styles.cryptoDivider} />
+            <View style={styles.cryptoItem}>
+              <View style={[styles.cryptoDot, { backgroundColor: AppColors.ethPurple }]} />
+              <Text style={styles.cryptoText}>{ethAmount} ETH</Text>
+            </View>
+          </View>
         </View>
-        
-        <Text style={styles.seller}>Sold by {product.sellerName}</Text>
+
+        {/* Footer */}
+        <View style={styles.footer}>
+          <View style={styles.sellerRow}>
+            <View style={styles.sellerAvatar}>
+              <Text style={styles.sellerAvatarText}>
+                {product.sellerName.charAt(0).toUpperCase()}
+              </Text>
+            </View>
+            <Text style={styles.sellerName} numberOfLines={1}>
+              {product.sellerName}
+            </Text>
+          </View>
+          <Ionicons name="chevron-forward" size={16} color={AppColors.textDim} />
+        </View>
       </View>
-    </TouchableOpacity>
+    </AnimatedPressable>
   );
 }
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: Colors.gray,
-    borderRadius: 12,
-    marginBottom: 16,
-    overflow: 'hidden',
+    backgroundColor: AppColors.surface,
+    borderRadius: Radii.lg,
     borderWidth: 1,
-    borderColor: '#333',
+    borderColor: AppColors.border,
+    marginBottom: Spacing.lg,
+    overflow: 'hidden',
+    ...Shadows.md,
+  },
+
+  // ── Image ──
+  imageWrapper: {
+    position: 'relative',
   },
   image: {
     width: '100%',
-    height: 180,
-    backgroundColor: '#1a1a1a',
+    height: 200,
+    backgroundColor: AppColors.surfaceAlt,
+  },
+  imageGradient: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: 40,
+    backgroundColor: 'transparent',
+    // Simulated gradient: a semi-transparent bar at the bottom of the image
+    borderBottomWidth: 0,
   },
   imageBadge: {
     position: 'absolute',
-    top: 8,
-    right: 8,
-    backgroundColor: 'rgba(0,0,0,0.7)',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
+    top: Spacing.sm,
+    right: Spacing.sm,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: AppColors.overlayLight,
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: Spacing.xs,
+    borderRadius: Radii.pill,
   },
   imageBadgeText: {
-    color: Colors.secondary,
-    fontSize: 12,
-    fontWeight: 'bold',
+    color: AppColors.secondary,
+    fontSize: 11,
+    fontWeight: '700',
   },
+  categoryPill: {
+    position: 'absolute',
+    top: Spacing.sm,
+    left: Spacing.sm,
+    backgroundColor: AppColors.accentSoft,
+    paddingHorizontal: 10,
+    paddingVertical: Spacing.xs,
+    borderRadius: Radii.pill,
+    borderWidth: 1,
+    borderColor: 'rgba(30,144,255,0.2)',
+  },
+  categoryText: {
+    ...Typography.label,
+    fontSize: 10,
+    color: AppColors.accent,
+    letterSpacing: 0.6,
+  },
+
+  // ── Content ──
   content: {
-    padding: 12,
+    padding: Spacing.lg,
   },
   title: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: Colors.secondary,
-    marginBottom: 4,
+    ...Typography.h3,
+    marginBottom: Spacing.sm,
   },
-  category: {
-    fontSize: 12,
-    color: Colors.lightGray,
-    textTransform: 'uppercase',
-    marginBottom: 8,
-  },
-  priceContainer: {
-    marginBottom: 8,
+
+  // ── Prices ──
+  priceRow: {
+    marginBottom: Spacing.md,
   },
   usdPrice: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: Colors.success,
-    marginBottom: 4,
+    ...Typography.price,
+    marginBottom: Spacing.xs,
   },
-  cryptoPrice: {
-    fontSize: 12,
-    color: Colors.lightGray,
+  cryptoContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
-  seller: {
-    fontSize: 11,
-    color: Colors.lightGray,
-    fontStyle: 'italic',
+  cryptoItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  cryptoDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+  },
+  cryptoText: {
+    ...Typography.crypto,
+  },
+  cryptoDivider: {
+    width: 1,
+    height: 10,
+    backgroundColor: AppColors.border,
+    marginHorizontal: Spacing.sm,
+  },
+
+  // ── Footer ──
+  footer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingTop: Spacing.md,
+    borderTopWidth: 1,
+    borderTopColor: AppColors.border,
+  },
+  sellerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  sellerAvatar: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: AppColors.elevated,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: Spacing.sm,
+    borderWidth: 1,
+    borderColor: AppColors.borderLight,
+  },
+  sellerAvatarText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: AppColors.textMuted,
+  },
+  sellerName: {
+    ...Typography.caption,
+    flex: 1,
   },
 });

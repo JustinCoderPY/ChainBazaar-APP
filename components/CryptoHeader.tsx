@@ -1,108 +1,196 @@
-import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ActivityIndicator } from 'react-native';
+import React, { useEffect, useState, useCallback } from 'react';
+import {
+  View,
+  Text,
+  Image,
+  StyleSheet,
+  TouchableOpacity,
+  ActivityIndicator,
+} from 'react-native';
+import { FontAwesome5 } from '@expo/vector-icons';
 import { Colors } from '../constants/Colors';
-import { getCryptoPrices } from '../services/coinGeckoApi';
 
-export default function CryptoHeader() {
-  const [btcPrice, setBtcPrice] = useState<number | null>(null);
-  const [ethPrice, setEthPrice] = useState<number | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(false);
+// ─── Props ──────────────────────────────────────────────────
+interface CryptoHeaderProps {
+  /** User's display name (null if guest) */
+  userName: string | null;
+  /** Whether the user is a guest (not logged in) */
+  isGuest: boolean;
+  /** Callback when profile avatar is pressed */
+  onProfilePress: () => void;
+  /** BTC price in USD — passed from parent so parent controls refresh */
+  btcPrice: number;
+  /** ETH price in USD — passed from parent so parent controls refresh */
+  ethPrice: number;
+  /** Whether prices are currently loading */
+  pricesLoading?: boolean;
+}
 
-  useEffect(() => {
-    fetchPrices();
-    const interval = setInterval(fetchPrices, 60000);
-    return () => clearInterval(interval);
-  }, []);
+export default function HomeHeader({
+  userName,
+  isGuest,
+  onProfilePress,
+  btcPrice,
+  ethPrice,
+  pricesLoading = false,
+}: CryptoHeaderProps) {
+  // ─── Avatar letter ─────────────────────────────────────────
+  const avatarLetter = isGuest
+    ? '?'
+    : userName?.charAt(0).toUpperCase() || '?';
 
-  const fetchPrices = async () => {
-    try {
-      const prices = await getCryptoPrices();
-      if (prices) {
-        setBtcPrice(prices.bitcoin.usd);
-        setEthPrice(prices.ethereum.usd);
-        setError(false);
-      } else {
-        setError(true);
-      }
-    } catch (err) {
-      console.log('Failed to fetch prices, will retry...'); // CHANGED: Don't show error to user
-      setError(true);
-    } finally {
-      setLoading(false);
-    }
+  // ─── Format price ──────────────────────────────────────────
+  const formatPrice = (price: number): string => {
+    return price.toLocaleString(undefined, {
+      maximumFractionDigits: 0,
+    });
   };
-
-  if (loading) {
-    return (
-      <View style={styles.container}>
-        <ActivityIndicator color={Colors.secondary} />
-      </View>
-    );
-  }
-
-  if (error || !btcPrice || !ethPrice) {
-    return (
-      <View style={styles.container}>
-        <Text style={styles.errorText}>Crypto prices unavailable</Text>
-      </View>
-    );
-  }
 
   return (
     <View style={styles.container}>
-      <View style={styles.priceBox}>
-        <Text style={styles.symbol}>₿ BTC</Text>
-        <Text style={styles.price}>
-          ${btcPrice?.toLocaleString(undefined, { maximumFractionDigits: 0 })}
-        </Text>
+      {/* ── Top Row: Logo + Profile Avatar ───────────────────── */}
+      <View style={styles.topRow}>
+        {/* Logo */}
+        <Image
+          source={require('../assets/images/chainbazaar-logo.png')}
+          style={styles.logo}
+          resizeMode="contain"
+        />
+
+        {/* Profile Avatar */}
+        <TouchableOpacity
+          style={styles.avatarButton}
+          onPress={onProfilePress}
+          activeOpacity={0.8}
+        >
+          <View style={styles.avatar}>
+            <Text style={styles.avatarText}>{avatarLetter}</Text>
+          </View>
+        </TouchableOpacity>
       </View>
-      
-      <View style={styles.divider} />
-      
-      <View style={styles.priceBox}>
-        <Text style={styles.symbol}>Ξ ETH</Text>
-        <Text style={styles.price}>
-          ${ethPrice?.toLocaleString(undefined, { maximumFractionDigits: 0 })}
-        </Text>
+
+      {/* ── Crypto Ticker Row ────────────────────────────────── */}
+      <View style={styles.tickerRow}>
+        {pricesLoading ? (
+          <ActivityIndicator color={Colors.secondary} size="small" />
+        ) : (
+          <>
+            {/* BTC */}
+            <View style={styles.tickerItem}>
+              <View style={styles.tickerIconContainer}>
+                <FontAwesome5 name="bitcoin" size={14} color="#F7931A" />
+              </View>
+              <View>
+                <Text style={styles.tickerLabel}>Bitcoin</Text>
+                <Text style={styles.tickerPrice}>${formatPrice(btcPrice)}</Text>
+              </View>
+            </View>
+
+            {/* Divider */}
+            <View style={styles.tickerDivider} />
+
+            {/* ETH */}
+            <View style={styles.tickerItem}>
+              <View style={[styles.tickerIconContainer, styles.ethIcon]}>
+                <FontAwesome5 name="ethereum" size={14} color="#627EEA" />
+              </View>
+              <View>
+                <Text style={styles.tickerLabel}>Ethereum</Text>
+                <Text style={styles.tickerPrice}>${formatPrice(ethPrice)}</Text>
+              </View>
+            </View>
+          </>
+        )}
       </View>
     </View>
   );
 }
 
+// ─── Styles ───────────────────────────────────────────────────
 const styles = StyleSheet.create({
   container: {
-    flexDirection: 'row',
-    backgroundColor: Colors.gray,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    justifyContent: 'space-around',
-    alignItems: 'center',
+    backgroundColor: Colors.primary,
+    paddingHorizontal: 20,
+    paddingTop: 8,
+    paddingBottom: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#333',
+    borderBottomColor: '#1E1E1E',
   },
-  priceBox: {
+
+  // ── Top Row ──
+  topRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 14,
+  },
+  logo: {
+    width: 160,
+    height: 44,
+  },
+
+  // ── Profile Avatar ──
+  avatarButton: {
+    padding: 2,
+  },
+  avatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#1E1E1E',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: Colors.accent,
+  },
+  avatarText: {
+    fontSize: 17,
+    fontWeight: 'bold',
+    color: Colors.secondary,
+  },
+
+  // ── Crypto Ticker ──
+  tickerRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    backgroundColor: '#1A1A1A',
+    borderRadius: 10,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    justifyContent: 'center',
   },
-  symbol: {
-    fontSize: 14,
-    fontWeight: 'bold',
-    color: Colors.accent,
+  tickerItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    gap: 10,
   },
-  price: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: Colors.success,
+  tickerIconContainer: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: 'rgba(247, 147, 26, 0.12)',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-  divider: {
-    width: 1,
-    height: 24,
-    backgroundColor: '#444',
+  ethIcon: {
+    backgroundColor: 'rgba(98, 126, 234, 0.12)',
   },
-  errorText: {
+  tickerLabel: {
+    fontSize: 11,
     color: Colors.lightGray,
-    fontSize: 12,
+    fontWeight: '500',
+    marginBottom: 1,
+  },
+  tickerPrice: {
+    fontSize: 15,
+    fontWeight: 'bold',
+    color: Colors.secondary,
+  },
+  tickerDivider: {
+    width: 1,
+    height: 28,
+    backgroundColor: '#333',
+    marginHorizontal: 16,
   },
 });

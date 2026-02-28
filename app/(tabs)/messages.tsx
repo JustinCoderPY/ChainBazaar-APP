@@ -1,0 +1,359 @@
+import React from 'react';
+import {
+  FlatList,
+  SafeAreaView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native';
+import { useRouter } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
+import { Colors } from '../../constants/Colors';
+import { useAuth } from '../../context/AuthContext';
+
+// ─── Types ──────────────────────────────────────────────────
+interface Conversation {
+  id: string;
+  userName: string;
+  avatarLetter: string;
+  avatarColor: string;
+  lastMessage: string;
+  timestamp: string;
+  unreadCount: number;
+  /** Whether the last message was sent by the current user */
+  isOwnMessage: boolean;
+}
+
+// ─── Mock Data ──────────────────────────────────────────────
+const MOCK_CONVERSATIONS: Conversation[] = [
+  {
+    id: 'conv_1',
+    userName: 'Sarah Miller',
+    avatarLetter: 'S',
+    avatarColor: '#1E90FF',
+    lastMessage: 'Is the iPhone 14 Pro still available?',
+    timestamp: '2m ago',
+    unreadCount: 2,
+    isOwnMessage: false,
+  },
+  {
+    id: 'conv_2',
+    userName: 'Alex Chen',
+    avatarLetter: 'A',
+    avatarColor: '#16C784',
+    lastMessage: 'Yeah I can do $1,750 for the laptop. Deal?',
+    timestamp: '15m ago',
+    unreadCount: 1,
+    isOwnMessage: false,
+  },
+  {
+    id: 'conv_3',
+    userName: 'Mike Johnson',
+    avatarLetter: 'M',
+    avatarColor: '#F7931A',
+    lastMessage: 'Sent you the tracking number',
+    timestamp: '1h ago',
+    unreadCount: 0,
+    isOwnMessage: true,
+  },
+  {
+    id: 'conv_4',
+    userName: 'Emma Watson',
+    avatarLetter: 'E',
+    avatarColor: '#A78BFA',
+    lastMessage: 'Can you ship to New York?',
+    timestamp: '3h ago',
+    unreadCount: 0,
+    isOwnMessage: false,
+  },
+  {
+    id: 'conv_5',
+    userName: 'David Lee',
+    avatarLetter: 'D',
+    avatarColor: '#EA3943',
+    lastMessage: 'Payment confirmed. Thanks!',
+    timestamp: '1d ago',
+    unreadCount: 0,
+    isOwnMessage: false,
+  },
+  {
+    id: 'conv_6',
+    userName: 'Lisa Brown',
+    avatarLetter: 'L',
+    avatarColor: '#6366F1',
+    lastMessage: 'Would you accept 0.015 BTC?',
+    timestamp: '2d ago',
+    unreadCount: 0,
+    isOwnMessage: false,
+  },
+];
+
+export default function MessagesScreen() {
+  const { isGuest } = useAuth();
+  const router = useRouter();
+
+  // ─── Guest State ──────────────────────────────────────────
+  if (isGuest) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.header}>
+          <Text style={styles.headerTitle}>Messages</Text>
+        </View>
+        <View style={styles.guestContainer}>
+          <Ionicons name="chatbubbles-outline" size={56} color="#333" />
+          <Text style={styles.guestTitle}>Sign in to view messages</Text>
+          <Text style={styles.guestSubtitle}>
+            Log in to chat with buyers and sellers
+          </Text>
+          <TouchableOpacity
+            style={styles.loginButton}
+            onPress={() => router.push('/auth/login')}
+          >
+            <Text style={styles.loginButtonText}>Login</Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  // ─── Render Conversation Item ─────────────────────────────
+  const renderItem = ({ item }: { item: Conversation }) => (
+    <TouchableOpacity
+      style={styles.conversationItem}
+      activeOpacity={0.6}
+      onPress={() => router.push(`/chat/${item.id}?name=${encodeURIComponent(item.userName)}&color=${encodeURIComponent(item.avatarColor)}`)}
+    >
+      {/* Avatar */}
+      <View style={[styles.avatar, { backgroundColor: item.avatarColor }]}>
+        <Text style={styles.avatarText}>{item.avatarLetter}</Text>
+      </View>
+
+      {/* Content */}
+      <View style={styles.conversationContent}>
+        <View style={styles.conversationTopRow}>
+          <Text style={styles.userName} numberOfLines={1}>
+            {item.userName}
+          </Text>
+          <Text style={[
+            styles.timestamp,
+            item.unreadCount > 0 && styles.timestampUnread,
+          ]}>
+            {item.timestamp}
+          </Text>
+        </View>
+        <View style={styles.conversationBottomRow}>
+          <Text
+            style={[
+              styles.lastMessage,
+              item.unreadCount > 0 && styles.lastMessageUnread,
+            ]}
+            numberOfLines={1}
+          >
+            {item.isOwnMessage ? 'You: ' : ''}
+            {item.lastMessage}
+          </Text>
+          {item.unreadCount > 0 && (
+            <View style={styles.unreadBadge}>
+              <Text style={styles.unreadBadgeText}>{item.unreadCount}</Text>
+            </View>
+          )}
+        </View>
+      </View>
+    </TouchableOpacity>
+  );
+
+  const renderSeparator = () => <View style={styles.separator} />;
+
+  // ─── Main Render ──────────────────────────────────────────
+  return (
+    <SafeAreaView style={styles.container}>
+      <View style={styles.header}>
+        <Text style={styles.headerTitle}>Messages</Text>
+        <Text style={styles.headerCount}>
+          {MOCK_CONVERSATIONS.filter(c => c.unreadCount > 0).length} unread
+        </Text>
+      </View>
+
+      <FlatList
+        data={MOCK_CONVERSATIONS}
+        keyExtractor={(item) => item.id}
+        renderItem={renderItem}
+        ItemSeparatorComponent={renderSeparator}
+        contentContainerStyle={styles.list}
+        ListEmptyComponent={
+          <View style={styles.emptyContainer}>
+            <Ionicons name="chatbubbles-outline" size={56} color="#333" />
+            <Text style={styles.emptyText}>No conversations yet</Text>
+            <Text style={styles.emptySubtext}>
+              Messages from buyers and sellers will appear here
+            </Text>
+          </View>
+        }
+      />
+    </SafeAreaView>
+  );
+}
+
+// ─── Styles ───────────────────────────────────────────────────
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: Colors.primary,
+  },
+
+  // ── Header ──
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'baseline',
+    paddingHorizontal: 20,
+    paddingTop: 12,
+    paddingBottom: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#1E1E1E',
+  },
+  headerTitle: {
+    fontSize: 28,
+    fontWeight: 'bold',
+    color: Colors.secondary,
+  },
+  headerCount: {
+    fontSize: 13,
+    color: Colors.accent,
+    fontWeight: '600',
+  },
+
+  // ── List ──
+  list: {
+    paddingBottom: 16,
+  },
+  separator: {
+    height: 1,
+    backgroundColor: '#1E1E1E',
+    marginLeft: 76,
+  },
+
+  // ── Conversation Item ──
+  conversationItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 14,
+  },
+  avatar: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 14,
+  },
+  avatarText: {
+    fontSize: 19,
+    fontWeight: 'bold',
+    color: Colors.secondary,
+  },
+  conversationContent: {
+    flex: 1,
+  },
+  conversationTopRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  userName: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: Colors.secondary,
+    flex: 1,
+    marginRight: 8,
+  },
+  timestamp: {
+    fontSize: 12,
+    color: '#555',
+  },
+  timestampUnread: {
+    color: Colors.accent,
+  },
+  conversationBottomRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  lastMessage: {
+    fontSize: 14,
+    color: '#666',
+    flex: 1,
+    marginRight: 8,
+  },
+  lastMessageUnread: {
+    color: Colors.lightGray,
+    fontWeight: '500',
+  },
+  unreadBadge: {
+    backgroundColor: Colors.accent,
+    minWidth: 20,
+    height: 20,
+    borderRadius: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 6,
+  },
+  unreadBadgeText: {
+    color: Colors.secondary,
+    fontSize: 11,
+    fontWeight: 'bold',
+  },
+
+  // ── Empty / Guest ──
+  emptyContainer: {
+    alignItems: 'center',
+    marginTop: 100,
+    paddingHorizontal: 40,
+  },
+  emptyText: {
+    fontSize: 18,
+    color: Colors.lightGray,
+    fontWeight: '600',
+    marginTop: 16,
+    marginBottom: 8,
+  },
+  emptySubtext: {
+    fontSize: 13,
+    color: '#555',
+    textAlign: 'center',
+    lineHeight: 18,
+  },
+  guestContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 40,
+  },
+  guestTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: Colors.secondary,
+    marginTop: 16,
+    marginBottom: 8,
+  },
+  guestSubtitle: {
+    fontSize: 14,
+    color: Colors.lightGray,
+    textAlign: 'center',
+    marginBottom: 24,
+  },
+  loginButton: {
+    backgroundColor: Colors.accent,
+    paddingHorizontal: 32,
+    paddingVertical: 12,
+    borderRadius: 8,
+  },
+  loginButtonText: {
+    color: Colors.secondary,
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+});
