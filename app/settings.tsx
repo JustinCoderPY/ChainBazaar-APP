@@ -11,7 +11,7 @@ import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../constants/Colors';
 import { Spacing, Radii, Shadows } from '../constants/theme';
-import { useAuth } from './AuthContext';
+import { useAuth } from '../context/AuthContext';
 import AnimatedPressable from '../components/AnimatedPressable';
 
 // ─── Types ──────────────────────────────────────────────────

@@ -10,7 +10,7 @@ import {
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../../constants/Colors';
-import { useAuth } from '../AuthContext';
+import { useAuth } from '../../context/AuthContext';
 
 // ─── Types ──────────────────────────────────────────────────
 interface Conversation {

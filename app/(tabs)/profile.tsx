@@ -1,5 +1,5 @@
 import { useFocusEffect, useRouter } from 'expo-router';
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import {
   Alert,
   Dimensions,
@@ -9,14 +9,16 @@ import {
   SafeAreaView,
   StyleSheet,
   Text,
-  TouchableOpacity,
   View,
 } from 'react-native';
 import { Colors } from '../../constants/Colors';
-import { getCryptoPrices } from '../../services/coinGeckoApi';
-import { getUserListings } from '../../services/firebaseService';
+import { Shadows, Radii, Spacing } from '../../constants/theme';
 import { Product } from '../../types';
-import { useAuth } from '../AuthContext';
+import { useAuth } from '../../context/AuthContext';
+import AnimatedPressable from '../../components/AnimatedPressable';
+
+// ✅ Firebase-backed profile listings
+import { getUserListings } from '../../services/firebaseService';
 
 const { width } = Dimensions.get('window');
 const CARD_WIDTH = (width - 48) / 2;
@@ -25,44 +27,24 @@ export default function ProfileScreen() {
   const { user, logout, isGuest } = useAuth();
   const router = useRouter();
   const [myListings, setMyListings] = useState<Product[]>([]);
-  const [btcPrice, setBtcPrice] = useState(50000);
-  const [ethPrice, setEthPrice] = useState(3000);
   const [refreshing, setRefreshing] = useState(false);
 
-  useFocusEffect(
-    React.useCallback(() => {
-      if (user) {
-        loadMyListings();
-      }
-    }, [user])
-  );
+  const loadMyListings = useCallback(async () => {
+    if (!user?.id) return;
 
-  useEffect(() => {
-    if (user) {
-      loadMyListings();
-    }
-  }, [user]);
-
-  const loadMyListings = async () => {
-    if (!user) return;
-    
     try {
-      console.log('Loading user listings from Firebase...');
-      // Load user's listings from Firebase
       const userProducts = await getUserListings(user.id);
-      console.log(`Loaded ${userProducts.length} listings for user`);
-      setMyListings(userProducts);
-
-      // Load crypto prices
-      const prices = await getCryptoPrices();
-      if (prices) {
-        setBtcPrice(prices.bitcoin.usd);
-        setEthPrice(prices.ethereum.usd);
-      }
+      setMyListings(userProducts ?? []);
     } catch (error) {
       console.error('Error loading listings:', error);
     }
-  };
+  }, [user?.id]);
+
+  useFocusEffect(
+    useCallback(() => {
+      loadMyListings();
+    }, [loadMyListings])
+  );
 
   const onRefresh = async () => {
     setRefreshing(true);
@@ -71,24 +53,20 @@ export default function ProfileScreen() {
   };
 
   const handleLogout = () => {
-    Alert.alert(
-      'Logout',
-      'Are you sure you want to logout?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { 
-          text: 'Logout', 
-          style: 'destructive',
-          onPress: async () => {
-            await logout();
-            Alert.alert('Success', 'Logged out successfully');
-          }
+    Alert.alert('Logout', 'Are you sure you want to logout?', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Logout',
+        style: 'destructive',
+        onPress: async () => {
+          await logout();
+          Alert.alert('Success', 'Logged out successfully');
         },
-      ]
-    );
+      },
+    ]);
   };
 
-  if (isGuest) {
+  if (isGuest || !user) {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.guestContainer}>
@@ -96,29 +74,32 @@ export default function ProfileScreen() {
           <Text style={styles.guestSubtitle}>
             Login to create listings and manage your profile
           </Text>
-          <TouchableOpacity
+          <AnimatedPressable
             style={styles.loginButton}
             onPress={() => router.push('/auth/login')}
+            scaleValue={0.96}
           >
             <Text style={styles.loginButtonText}>Login / Sign Up</Text>
-          </TouchableOpacity>
+          </AnimatedPressable>
         </View>
       </SafeAreaView>
     );
   }
 
   const renderGridItem = ({ item }: { item: Product }) => {
-    const imageUrl = item.imageUrls && item.imageUrls.length > 0
-      ? item.imageUrls[0]
-      : 'https://picsum.photos/300';
+    const imageUrl =
+      item.imageUrls && item.imageUrls.length > 0
+        ? item.imageUrls[0]
+        : 'https://picsum.photos/300';
 
     return (
-      <TouchableOpacity 
+      <AnimatedPressable
         style={styles.gridCard}
         onPress={() => router.push(`/product/${item.id}`)}
+        scaleValue={0.96}
       >
-        <Image 
-          source={{ uri: imageUrl }} 
+        <Image
+          source={{ uri: imageUrl }}
           style={styles.gridImage}
           resizeMode="cover"
         />
@@ -126,19 +107,19 @@ export default function ProfileScreen() {
           <Text style={styles.gridTitle} numberOfLines={2}>
             {item.title}
           </Text>
-          <Text style={styles.gridPrice}>${item.price.toFixed(2)}</Text>
+          <Text style={styles.gridPrice}>${Number(item.price).toFixed(2)}</Text>
         </View>
-      </TouchableOpacity>
+      </AnimatedPressable>
     );
   };
+
+  const initials = (user?.name?.trim()?.charAt(0) || 'U').toUpperCase();
 
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
         <View style={styles.avatar}>
-          <Text style={styles.avatarText}>
-            {user?.name?.charAt(0).toUpperCase()}
-          </Text>
+          <Text style={styles.avatarText}>{initials}</Text>
         </View>
         <Text style={styles.name}>{user?.name}</Text>
         <Text style={styles.email}>{user?.email}</Text>
@@ -154,27 +135,29 @@ export default function ProfileScreen() {
           </View>
           <View style={styles.statBox}>
             <Text style={styles.statNumber}>0</Text>
-            <Text style={styles.statLabel}>FAVORITES</Text>
+            <Text style={styles.statLabel}>FAVS</Text>
           </View>
         </View>
 
-        <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
+        <AnimatedPressable
+          style={styles.logoutButton}
+          onPress={handleLogout}
+          scaleValue={0.95}
+        >
           <Text style={styles.logoutButtonText}>Logout</Text>
-        </TouchableOpacity>
+        </AnimatedPressable>
       </View>
-
-      <Text style={styles.sectionTitle}>My Listings</Text>
 
       <FlatList
         data={myListings}
-        keyExtractor={(item) => item.id}
-        renderItem={renderGridItem}
+        keyExtractor={(item) => String(item.id)}
         numColumns={2}
-        columnWrapperStyle={styles.gridRow}
+        renderItem={renderGridItem}
         contentContainerStyle={styles.gridList}
+        columnWrapperStyle={styles.gridRow}
         refreshControl={
-          <RefreshControl 
-            refreshing={refreshing} 
+          <RefreshControl
+            refreshing={refreshing}
             onRefresh={onRefresh}
             tintColor={Colors.secondary}
           />
@@ -182,6 +165,14 @@ export default function ProfileScreen() {
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
             <Text style={styles.emptyText}>No listings yet</Text>
+            <Text style={styles.emptySubtext}>Create your first listing!</Text>
+            <AnimatedPressable
+              style={styles.createButton}
+              onPress={() => router.push('/(tabs)/create')}
+              scaleValue={0.96}
+            >
+              <Text style={styles.createButtonText}>Create Listing</Text>
+            </AnimatedPressable>
           </View>
         }
       />
@@ -189,55 +180,62 @@ export default function ProfileScreen() {
   );
 }
 
-// ... (keep all the existing styles)
 const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: Colors.primary,
   },
+
+  // Guest view
   guestContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 24,
+    padding: Spacing.xxl,
   },
   guestTitle: {
     fontSize: 28,
     fontWeight: 'bold',
     color: Colors.secondary,
-    marginBottom: 12,
+    marginBottom: Spacing.md,
   },
   guestSubtitle: {
     fontSize: 16,
     color: Colors.lightGray,
     textAlign: 'center',
-    marginBottom: 32,
+    marginBottom: Spacing.xxxl,
+    lineHeight: 22,
   },
   loginButton: {
     backgroundColor: Colors.accent,
-    paddingHorizontal: 32,
-    paddingVertical: 16,
-    borderRadius: 8,
+    paddingHorizontal: Spacing.xxxl,
+    paddingVertical: Spacing.lg,
+    borderRadius: Radii.md,
+    ...Shadows.glow(Colors.accent),
   },
   loginButtonText: {
     color: Colors.secondary,
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: 'bold',
   },
+
+  // Header
   header: {
     alignItems: 'center',
-    padding: 24,
+    padding: Spacing.xxl,
     borderBottomWidth: 1,
     borderBottomColor: '#333',
   },
   avatar: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
+    width: 90,
+    height: 90,
+    borderRadius: 45,
     backgroundColor: Colors.accent,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: Spacing.md,
+    borderWidth: 3,
+    borderColor: Colors.success,
   },
   avatarText: {
     fontSize: 36,
@@ -253,63 +251,65 @@ const styles = StyleSheet.create({
   email: {
     fontSize: 14,
     color: Colors.lightGray,
-    marginBottom: 20,
+    marginBottom: Spacing.lg,
   },
+
   statsContainer: {
     flexDirection: 'row',
-    gap: 32,
-    marginBottom: 20,
+    justifyContent: 'space-around',
+    width: '100%',
+    marginBottom: Spacing.lg,
   },
   statBox: {
     alignItems: 'center',
+    paddingHorizontal: Spacing.lg,
   },
   statNumber: {
-    fontSize: 24,
+    fontSize: 22,
     fontWeight: 'bold',
-    color: Colors.success,
+    color: Colors.secondary,
+    marginBottom: 4,
   },
   statLabel: {
     fontSize: 12,
+    fontWeight: 'bold',
     color: Colors.lightGray,
+    letterSpacing: 1,
   },
+
   logoutButton: {
     backgroundColor: Colors.danger,
-    paddingHorizontal: 24,
-    paddingVertical: 10,
-    borderRadius: 8,
+    paddingHorizontal: Spacing.xxxl,
+    paddingVertical: Spacing.md,
+    borderRadius: Radii.md,
+    ...Shadows.md,
   },
   logoutButtonText: {
     color: Colors.secondary,
     fontSize: 14,
     fontWeight: 'bold',
   },
-  sectionTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: Colors.secondary,
-    padding: 16,
-    paddingBottom: 8,
-  },
+
+  // Grid
   gridList: {
-    paddingHorizontal: 16,
-    paddingBottom: 16,
+    padding: 16,
+    paddingBottom: 32,
   },
   gridRow: {
     justifyContent: 'space-between',
-    marginBottom: 16,
   },
   gridCard: {
     width: CARD_WIDTH,
     backgroundColor: Colors.gray,
-    borderRadius: 12,
+    borderRadius: Radii.md,
+    marginBottom: 16,
     overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: '#333',
+    ...Shadows.md,
   },
   gridImage: {
     width: '100%',
-    aspectRatio: 1,
-    backgroundColor: Colors.gray,
+    height: CARD_WIDTH,
+    backgroundColor: '#111',
   },
   gridInfo: {
     padding: 12,
@@ -319,20 +319,41 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: Colors.secondary,
     marginBottom: 6,
-    minHeight: 36,
   },
   gridPrice: {
     fontSize: 16,
     fontWeight: 'bold',
     color: Colors.success,
   },
+
+  // Empty
   emptyContainer: {
     alignItems: 'center',
-    marginTop: 40,
-    width: '100%',
+    marginTop: 60,
+    paddingHorizontal: 24,
   },
   emptyText: {
-    fontSize: 16,
+    fontSize: 20,
+    fontWeight: 'bold',
     color: Colors.lightGray,
+    marginBottom: 8,
+  },
+  emptySubtext: {
+    fontSize: 14,
+    color: Colors.lightGray,
+    textAlign: 'center',
+    marginBottom: 18,
+  },
+  createButton: {
+    backgroundColor: Colors.success,
+    paddingHorizontal: 22,
+    paddingVertical: 12,
+    borderRadius: Radii.md,
+    ...Shadows.glow(Colors.success),
+  },
+  createButtonText: {
+    color: Colors.secondary,
+    fontSize: 14,
+    fontWeight: 'bold',
   },
 });
