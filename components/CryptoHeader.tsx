@@ -9,6 +9,7 @@ import {
 } from 'react-native';
 import { FontAwesome5 } from '@expo/vector-icons';
 import { Colors } from '../constants/Colors';
+import { formatPercentChange } from '../services/cryptoPriceService';
 
 // ─── Props ──────────────────────────────────────────────────
 interface CryptoHeaderProps {
@@ -22,6 +23,10 @@ interface CryptoHeaderProps {
   btcPrice: number;
   /** ETH price in USD — passed from parent so parent controls refresh */
   ethPrice: number;
+  /** BTC 24h percentage change */
+  btcChange24h: number;
+  /** ETH 24h percentage change */
+  ethChange24h: number;
   /** Whether prices are currently loading */
   pricesLoading?: boolean;
 }
@@ -32,6 +37,8 @@ export default function HomeHeader({
   onProfilePress,
   btcPrice,
   ethPrice,
+  btcChange24h,
+  ethChange24h,
   pricesLoading = false,
 }: CryptoHeaderProps) {
   // ─── Avatar letter ─────────────────────────────────────────
@@ -83,6 +90,9 @@ export default function HomeHeader({
               <View>
                 <Text style={styles.tickerLabel}>Bitcoin</Text>
                 <Text style={styles.tickerPrice}>${formatPrice(btcPrice)}</Text>
+                <Text style={[styles.tickerChange, btcChange24h >= 0 ? styles.positive : styles.negative]}>
+                  {formatPercentChange(btcChange24h)}
+                </Text>
               </View>
             </View>
 
@@ -97,6 +107,9 @@ export default function HomeHeader({
               <View>
                 <Text style={styles.tickerLabel}>Ethereum</Text>
                 <Text style={styles.tickerPrice}>${formatPrice(ethPrice)}</Text>
+                <Text style={[styles.tickerChange, ethChange24h >= 0 ? styles.positive : styles.negative]}>
+                  {formatPercentChange(ethChange24h)}
+                </Text>
               </View>
             </View>
           </>
@@ -186,6 +199,17 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: 'bold',
     color: Colors.secondary,
+  },
+  tickerChange: {
+    fontSize: 11,
+    fontWeight: '500',
+    marginTop: 1,
+  },
+  positive: {
+    color: '#4CAF50',
+  },
+  negative: {
+    color: '#F44336',
   },
   tickerDivider: {
     width: 1,
