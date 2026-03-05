@@ -1,53 +1,103 @@
 import { addDoc, collection, deleteDoc, doc, getDocs, orderBy, query, where } from 'firebase/firestore';
 import { getDownloadURL, ref, uploadBytes } from 'firebase/storage';
-import {auth, db, storage } from '../config/firebase';
+import { auth, db, storage } from '../config/firebase';
 import { Product } from '../types';
+
 
 type FirebaseLikeError = {
   code?: string;
 };
 
-const isPermissionDeniedError = (error: unknown): boolean => {
-  const firebaseError = error as FirebaseLikeError | null;
-  return firebaseError?.code === 'permission-denied';
+type FirestoreDocLike = {
+  id: string;
+  data: () => unknown;
 };
 
-const normalizeAndSortProducts = (docs: Array<{ id: string; data: () => unknown }>): Product[] => {
-  const products = docs.map((snapshot) => ({
+type ProductOwnerField = 'sellerId' | 'creatorId' | 'userId';
+
+const PRODUCT_OWNER_FIELDS: ProductOwnerField[] = ['sellerId', 'creatorId', 'userId'];
+
+const isPermissionDeniedError = (error: unknown): boolean => {
+  const firebaseError = error as FirebaseLikeError | null;
+  return firebaseError?.code === 'permission-denied' || firebaseError?.code === 'firestore/permission-denied';
+};
+
+const createdAtToMillis = (createdAt: unknown): number => {
+  if (!createdAt) {
+    return 0;
+  }
+
+  if (typeof createdAt === 'string' || typeof createdAt === 'number') {
+    const millis = new Date(createdAt).getTime();
+    return Number.isFinite(millis) ? millis : 0;
+  }
+
+  if (typeof createdAt === 'object' && createdAt !== null) {
+    const timestampLike = createdAt as { toMillis?: () => number; seconds?: number; nanoseconds?: number };
+    if (typeof timestampLike.toMillis === 'function') {
+      return timestampLike.toMillis();
+    }
+
+    if (typeof timestampLike.seconds === 'number') {
+      return timestampLike.seconds * 1000 + Math.floor((timestampLike.nanoseconds ?? 0) / 1_000_000);
+    }
+  }
+
+  return 0;
+};
+
+const normalizeProduct = (snapshot: FirestoreDocLike): Product => {
+  const raw = snapshot.data() as Partial<Product> & {
+    creatorId?: string;
+    userId?: string;
+    ownerId?: string;
+    createdAt?: unknown;
+  };
+
+  const ownerId = raw.sellerId || raw.creatorId || raw.userId || raw.ownerId || '';
+  const createdAtMillis = createdAtToMillis(raw.createdAt);
+
+  return {
     id: snapshot.id,
-    ...(snapshot.data() as Omit<Product, 'id'>),
-  }));
+    title: raw.title || '',
+    description: raw.description || '',
+    price: Number(raw.price || 0),
+    category: raw.category || '',
+    imageUrls: Array.isArray(raw.imageUrls) ? raw.imageUrls : [],
+    sellerId: ownerId,
+    sellerName: raw.sellerName || '',
+    // Keep Product shape consistent in app state while accepting Timestamp/string in Firestore.
+    createdAt: createdAtMillis > 0 ? new Date(createdAtMillis).toISOString() : new Date(0).toISOString(),
+  };
+};
+
+const normalizeAndSortProducts = (docs: FirestoreDocLike[]): Product[] => {
+  const products = docs.map((snapshot) => normalizeProduct(snapshot));
 
   products.sort((a, b) => {
-    const aCreatedAt = a.createdAt ? new Date(a.createdAt).getTime() : 0;
-    const bCreatedAt = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+    const aCreatedAt = createdAtToMillis(a.createdAt);
+    const bCreatedAt = createdAtToMillis(b.createdAt);
     return bCreatedAt - aCreatedAt;
   });
 
   return products;
 };
 
-const getUserListingsByField = async (userId: string, ownerField: 'sellerId' | 'creatorId' | 'userId') => {
+const getUserListingsByField = async (userId: string, ownerField: ProductOwnerField) => {
   const userQuery = query(collection(db, 'products'), where(ownerField, '==', userId));
   const querySnapshot = await getDocs(userQuery);
   return querySnapshot.docs;
 };
 
-
 // Upload image to Firebase Storage
 export const uploadImage = async (uri: string, filename: string): Promise<string> => {
   try {
-    // Fetch the image as a blob
     const response = await fetch(uri);
     const blob = await response.blob();
-
-    // Create a reference to the storage location
     const storageRef = ref(storage, `listings/${filename}`);
 
-    // Upload the blob
     await uploadBytes(storageRef, blob);
 
-    // Get the download URL
     const downloadURL = await getDownloadURL(storageRef);
     return downloadURL;
   } catch (error) {
@@ -59,12 +109,10 @@ export const uploadImage = async (uri: string, filename: string): Promise<string
 // Create a new listing
 export const createListing = async (productData: Omit<Product, 'id'>): Promise<string> => {
   try {
-    const ownerId = productData.sellerId;
     const docRef = await addDoc(collection(db, 'products'), {
       ...productData,
-      // Backward-compatible owner fields for existing rules/data models
-      creatorId: ownerId,
-      userId: ownerId,
+      // Canonical owner field going forward.
+      sellerId: productData.sellerId,
       createdAt: new Date().toISOString(),
     });
     return docRef.id;
@@ -79,12 +127,14 @@ export const getAllListings = async (): Promise<Product[]> => {
   try {
     const q = query(collection(db, 'products'), orderBy('createdAt', 'desc'));
     const querySnapshot = await getDocs(q);
-    
     return normalizeAndSortProducts(querySnapshot.docs);
   } catch (error) {
     if (!isPermissionDeniedError(error)) {
       console.error('Error getting listings:', error);
+      return [];
     }
+
+    console.warn('[Listings] Global products query blocked by Firestore rules. Falling back to current user listings.');
 
     const currentUserId = auth.currentUser?.uid;
     if (!currentUserId) {
@@ -98,16 +148,25 @@ export const getAllListings = async (): Promise<Product[]> => {
 
 // Get user's listings
 export const getUserListings = async (userId: string): Promise<Product[]> => {
-  const ownerFields: Array<'sellerId' | 'creatorId' | 'userId'> = ['sellerId', 'creatorId', 'userId'];
   let lastUnexpectedError: unknown = null;
 
-  for (const ownerField of ownerFields) {
+  for (const ownerField of PRODUCT_OWNER_FIELDS) {
     try {
       const docs = await getUserListingsByField(userId, ownerField);
       if (docs.length > 0) {
         return normalizeAndSortProducts(docs);
       }
     } catch (error) {
+      if (isPermissionDeniedError(error)) {
+        // If rules only permit `sellerId` queries, avoid spamming extra denied queries.
+        if (ownerField === 'sellerId') {
+          console.warn('[Listings] User listings query denied on canonical sellerId field.');
+          return [];
+        }
+
+        continue;
+      }
+
       if (!isPermissionDeniedError(error)) {
         lastUnexpectedError = error;
       }
@@ -129,5 +188,4 @@ export const deleteListing = async (productId: string): Promise<void> => {
     console.error('Error deleting listing:', error);
     throw error;
   }
-
 };
