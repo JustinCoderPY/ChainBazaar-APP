@@ -1,28 +1,24 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import { FontAwesome5 } from '@expo/vector-icons';
 import {
-  View,
-  Text,
+  ActivityIndicator,
   Image,
   StyleSheet,
+  Text,
   TouchableOpacity,
-  ActivityIndicator,
+  View,
 } from 'react-native';
-import { FontAwesome5 } from '@expo/vector-icons';
 import { Colors } from '../constants/Colors';
+import { formatPercentChange } from '../services/cryptoPriceService'; // ✅ NEW import
 
 // ─── Props ──────────────────────────────────────────────────
 interface CryptoHeaderProps {
-  /** User's display name (null if guest) */
   userName: string | null;
-  /** Whether the user is a guest (not logged in) */
   isGuest: boolean;
-  /** Callback when profile avatar is pressed */
   onProfilePress: () => void;
-  /** BTC price in USD — passed from parent so parent controls refresh */
   btcPrice: number;
-  /** ETH price in USD — passed from parent so parent controls refresh */
   ethPrice: number;
-  /** Whether prices are currently loading */
+  btcChange24h?: number;    // ✅ NEW
+  ethChange24h?: number;    // ✅ NEW
   pricesLoading?: boolean;
 }
 
@@ -32,14 +28,14 @@ export default function HomeHeader({
   onProfilePress,
   btcPrice,
   ethPrice,
+  btcChange24h = 0,    // ✅ NEW with default
+  ethChange24h = 0,    // ✅ NEW with default
   pricesLoading = false,
 }: CryptoHeaderProps) {
-  // ─── Avatar letter ─────────────────────────────────────────
   const avatarLetter = isGuest
     ? '?'
     : userName?.charAt(0).toUpperCase() || '?';
 
-  // ─── Format price ──────────────────────────────────────────
   const formatPrice = (price: number): string => {
     return price.toLocaleString(undefined, {
       maximumFractionDigits: 0,
@@ -50,14 +46,11 @@ export default function HomeHeader({
     <View style={styles.container}>
       {/* ── Top Row: Logo + Profile Avatar ───────────────────── */}
       <View style={styles.topRow}>
-        {/* Logo */}
         <Image
           source={require('../assets/images/chainbazaar-logo.png')}
           style={styles.logo}
           resizeMode="contain"
         />
-
-        {/* Profile Avatar */}
         <TouchableOpacity
           style={styles.avatarButton}
           onPress={onProfilePress}
@@ -83,6 +76,15 @@ export default function HomeHeader({
               <View>
                 <Text style={styles.tickerLabel}>Bitcoin</Text>
                 <Text style={styles.tickerPrice}>${formatPrice(btcPrice)}</Text>
+                {/* ✅ NEW: 24h percentage change */}
+                <Text
+                  style={[
+                    styles.tickerChange,
+                    { color: btcChange24h >= 0 ? '#4ADE80' : '#F87171' },
+                  ]}
+                >
+                  {formatPercentChange(btcChange24h)}
+                </Text>
               </View>
             </View>
 
@@ -97,6 +99,15 @@ export default function HomeHeader({
               <View>
                 <Text style={styles.tickerLabel}>Ethereum</Text>
                 <Text style={styles.tickerPrice}>${formatPrice(ethPrice)}</Text>
+                {/* ✅ NEW: 24h percentage change */}
+                <Text
+                  style={[
+                    styles.tickerChange,
+                    { color: ethChange24h >= 0 ? '#4ADE80' : '#F87171' },
+                  ]}
+                >
+                  {formatPercentChange(ethChange24h)}
+                </Text>
               </View>
             </View>
           </>
@@ -116,8 +127,6 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#1E1E1E',
   },
-
-  // ── Top Row ──
   topRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -128,8 +137,6 @@ const styles = StyleSheet.create({
     width: 160,
     height: 44,
   },
-
-  // ── Profile Avatar ──
   avatarButton: {
     padding: 2,
   },
@@ -148,8 +155,6 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: Colors.secondary,
   },
-
-  // ── Crypto Ticker ──
   tickerRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -186,6 +191,12 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: 'bold',
     color: Colors.secondary,
+  },
+  // ✅ NEW style for the percentage change
+  tickerChange: {
+    fontSize: 11,
+    fontWeight: '600',
+    marginTop: 1,
   },
   tickerDivider: {
     width: 1,

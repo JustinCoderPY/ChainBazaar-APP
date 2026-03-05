@@ -1,5 +1,5 @@
 import { useFocusEffect, useRouter } from 'expo-router';
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Alert,
   FlatList,
@@ -14,7 +14,7 @@ import CryptoHeader from '../../components/CryptoHeader';
 import ProductCard from '../../components/ProductCard';
 import { Colors } from '../../constants/Colors';
 import { useAuth } from '../../context/AuthContext';
-import { getCryptoPrices } from '../../services/cryptoPriceService'; // ✅ Peter’s price service
+import { getCryptoPrices } from '../../services/cryptoPriceService'; // ✅ Peter's price service
 import { getAllListings } from '../../services/firebaseService'; // ✅ Firebase
 import { Product } from '../../types';
 
@@ -23,6 +23,8 @@ export default function HomeScreen() {
   const [searchQuery, setSearchQuery] = useState('');
   const [btcPrice, setBtcPrice] = useState(97000);
   const [ethPrice, setEthPrice] = useState(2700);
+  const [btcChange24h, setBtcChange24h] = useState(0);   // ✅ NEW: 24h % change for BTC
+  const [ethChange24h, setEthChange24h] = useState(0);   // ✅ NEW: 24h % change for ETH
   const [refreshing, setRefreshing] = useState(false);
   const [pricesLoading, setPricesLoading] = useState(false);
 
@@ -44,15 +46,19 @@ export default function HomeScreen() {
       // ✅ Load crypto prices (supports both return shapes)
       const prices: any = await getCryptoPrices();
 
-      // If Peter’s service returns { btcPrice, ethPrice }
+      // If Peter's service returns { btcPrice, ethPrice, btcChange24h, ethChange24h }
       if (prices?.btcPrice != null && prices?.ethPrice != null) {
         setBtcPrice(prices.btcPrice);
         setEthPrice(prices.ethPrice);
+        setBtcChange24h(prices.btcChange24h ?? 0);   // ✅ NEW: extract 24h change
+        setEthChange24h(prices.ethChange24h ?? 0);   // ✅ NEW: extract 24h change
       }
       // If another service returns CoinGecko shape { bitcoin: { usd }, ethereum: { usd } }
       else if (prices?.bitcoin?.usd != null && prices?.ethereum?.usd != null) {
         setBtcPrice(prices.bitcoin.usd);
         setEthPrice(prices.ethereum.usd);
+        setBtcChange24h(prices.bitcoin.usd_24h_change ?? 0);   // ✅ NEW: extract 24h change
+        setEthChange24h(prices.ethereum.usd_24h_change ?? 0);  // ✅ NEW: extract 24h change
       }
     } catch (error) {
       console.error('Error loading data:', error);
@@ -106,6 +112,8 @@ export default function HomeScreen() {
           onProfilePress={() => router.push('/settings')}
           btcPrice={btcPrice}
           ethPrice={ethPrice}
+          btcChange24h={btcChange24h}    // ✅ NEW: pass 24h change to header
+          ethChange24h={ethChange24h}    // ✅ NEW: pass 24h change to header
           pricesLoading={pricesLoading}
         />
 

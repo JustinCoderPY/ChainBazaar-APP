@@ -1,36 +1,38 @@
-import { useLocalSearchParams, useRouter } from 'expo-router';
-import React, { useEffect, useState } from 'react';
-import {
-    Alert,
-    Dimensions,
-    Image,
-    SafeAreaView,
-    ScrollView,
-    Share,
-    StyleSheet,
-    Text,
-    View,
-} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { Colors } from '../../constants/Colors';
-import { Shadows, Radii, Spacing } from '../../constants/theme';
-import { getCryptoPrices } from '../../services/cryptoPriceService';
-import { getAllListings, deleteListing } from '../../services/firebaseService'; // ✅
-import { Product } from '../../types';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useEffect, useState } from 'react';
+import {
+  Alert,
+  Dimensions,
+  Image,
+  SafeAreaView,
+  ScrollView,
+  Share,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 import AnimatedPressable from '../../components/AnimatedPressable';
+import { Colors } from '../../constants/Colors';
+import { Radii, Shadows } from '../../constants/theme';
 import { useAuth } from '../../context/AuthContext';
+import { getCryptoPrices } from '../../services/cryptoPriceService';
+import { deleteListing, getAllListings } from '../../services/firebaseService';
+import { getOrCreateConversation } from '../../services/messageService'; // ✅ NEW
+import { Product } from '../../types';
 
 const { width } = Dimensions.get('window');
 
 export default function ProductDetailsScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { user } = useAuth();   
+  const { user, isGuest } = useAuth();    // ✅ also grab isGuest
   const [product, setProduct] = useState<Product | null>(null);
   const [btcPrice, setBtcPrice] = useState(97000);
   const [ethPrice, setEthPrice] = useState(2700);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
-  
+  const [messagingLoading, setMessagingLoading] = useState(false); // ✅ NEW
+
   const isOwner =
     !!user?.id &&
     !!product?.sellerId &&
@@ -57,7 +59,7 @@ export default function ProductDetailsScreen() {
 
   const loadCryptoPrices = async () => {
     try {
-    const prices = await getCryptoPrices();
+      const prices = await getCryptoPrices();
       setBtcPrice(prices.btcPrice);
       setEthPrice(prices.ethPrice);
     } catch (error) {
@@ -92,7 +94,6 @@ export default function ProductDetailsScreen() {
 
   const handleShare = async () => {
     if (!product) return;
-    
     try {
       await Share.share({
         message: `Check out this listing on ChainBazaar!\n\n${product.title}\n$${product.price}\n\n${product.description}`,
@@ -100,6 +101,46 @@ export default function ProductDetailsScreen() {
       });
     } catch (error) {
       console.error('Error sharing:', error);
+    }
+  };
+
+  // ✅ NEW: Message Seller handler
+  const handleMessageSeller = async () => {
+    if (!product || !user?.id) return;
+
+    if (isGuest) {
+      Alert.alert('Login Required', 'Please login to message sellers', [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Login', onPress: () => router.push('/auth/login') },
+      ]);
+      return;
+    }
+
+    if (isOwner) {
+      Alert.alert('Info', "You can't message yourself!");
+      return;
+    }
+
+    setMessagingLoading(true);
+
+    try {
+      const conversationId = await getOrCreateConversation(
+        user.id,
+        user.name,
+        product.sellerId,
+        product.sellerName,
+        product.id,
+        product.title,
+      );
+
+      router.push(
+        `/chat/${conversationId}?name=${encodeURIComponent(product.sellerName)}`
+      );
+    } catch (error) {
+      console.error('Error creating conversation:', error);
+      Alert.alert('Error', 'Could not start conversation. Please try again.');
+    } finally {
+      setMessagingLoading(false);
     }
   };
 
@@ -123,20 +164,20 @@ export default function ProductDetailsScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <ScrollView>
-        <View style={styles.header}>
-          <AnimatedPressable
-            style={styles.backButton}
-            onPress={() => router.back()}
-            scaleValue={0.9}
-          >
-            <Ionicons name="arrow-back" size={20} color={Colors.secondary} />
-            <Text style={styles.backButtonText}>Back</Text>
+      <ScrollView showsVerticalScrollIndicator={false}>
+        {/* ── Back + Share Bar ─────────────────────────────── */}
+        <View style={styles.topBar}>
+          <AnimatedPressable style={styles.backButton} onPress={() => router.back()}>
+            <Ionicons name="arrow-back" size={24} color={Colors.secondary} />
+          </AnimatedPressable>
+          <AnimatedPressable style={styles.shareButton} onPress={handleShare}>
+            <Ionicons name="share-outline" size={22} color={Colors.secondary} />
           </AnimatedPressable>
         </View>
 
-        <ScrollView 
-          horizontal 
+        {/* ── Image Carousel ──────────────────────────────── */}
+        <ScrollView
+          horizontal
           pagingEnabled
           showsHorizontalScrollIndicator={false}
           onMomentumScrollEnd={(e) => {
@@ -144,18 +185,19 @@ export default function ProductDetailsScreen() {
             setCurrentImageIndex(index);
           }}
         >
-          {images.map((uri, index) => (
+          {images.map((url, index) => (
             <Image
               key={index}
-              source={{ uri }}
+              source={{ uri: url }}
               style={styles.image}
               resizeMode="cover"
             />
           ))}
         </ScrollView>
 
+        {/* Page Dots */}
         {images.length > 1 && (
-          <View style={styles.imageIndicator}>
+          <View style={styles.dotsContainer}>
             {images.map((_, index) => (
               <View
                 key={index}
@@ -179,54 +221,56 @@ export default function ProductDetailsScreen() {
             <Text style={styles.usdPrice}>${product.price.toFixed(2)}</Text>
             <View style={styles.cryptoPrices}>
               <Text style={styles.cryptoPrice}>
-                <Ionicons name="logo-bitcoin" size={13} color={Colors.btcOrange} /> {btcAmount} BTC
+                <Ionicons name="logo-bitcoin" size={13} color={Colors.accent} /> {btcAmount} BTC
               </Text>
               <Text style={styles.cryptoPrice}>
-                <Ionicons name="diamond-outline" size={13} color={Colors.ethPurple} /> {ethAmount} ETH
+                <Ionicons name="diamond-outline" size={13} color="#627EEA" /> {ethAmount} ETH
               </Text>
             </View>
           </View>
 
-          <View style={styles.divider} />
+          {/* Seller Info */}
+          <View style={styles.sellerSection}>
+            <View style={styles.sellerAvatar}>
+              <Text style={styles.sellerAvatarText}>
+                {product.sellerName.charAt(0).toUpperCase()}
+              </Text>
+            </View>
+            <View style={styles.sellerInfo}>
+              <Text style={styles.sellerLabel}>Seller</Text>
+              <Text style={styles.sellerName}>{product.sellerName}</Text>
+            </View>
+          </View>
 
-          <Text style={styles.sectionTitle}>Description</Text>
+          {/* Description */}
+          <Text style={styles.descriptionLabel}>Description</Text>
           <Text style={styles.description}>{product.description}</Text>
 
-          <View style={styles.divider} />
-
-          <Text style={styles.sectionTitle}>Seller Information</Text>
-          <Text style={styles.sellerName}>{product.sellerName || 'Unknown Seller'}</Text>
-          <Text style={styles.listedDate}>
-            Listed on {product.createdAt ? new Date(product.createdAt).toLocaleDateString() : 'Unknown date'}
-          </Text>
+          {/* ── Action Buttons ─────────────────────────────── */}
+          {isOwner ? (
+            <AnimatedPressable style={styles.deleteButton} onPress={handleDelete}>
+              <Ionicons name="trash-outline" size={20} color="#FF4444" />
+              <Text style={styles.deleteButtonText}>Delete Listing</Text>
+            </AnimatedPressable>
+          ) : (
+            <AnimatedPressable
+              style={styles.messageButton}
+              onPress={handleMessageSeller}
+              disabled={messagingLoading}
+            >
+              <Ionicons name="chatbubble-outline" size={20} color={Colors.secondary} />
+              <Text style={styles.messageButtonText}>
+                {messagingLoading ? 'Opening Chat...' : 'Message Seller'}
+              </Text>
+            </AnimatedPressable>
+          )}
         </View>
       </ScrollView>
-
-      <View style={styles.footer}>
-        <AnimatedPressable
-          style={styles.shareButton}
-          onPress={handleShare}
-          scaleValue={0.96}
-        >
-          <Ionicons name="share-outline" size={18} color={Colors.secondary} />
-          <Text style={styles.shareButtonText}>Share</Text>
-        </AnimatedPressable>
-
-        {isOwner && (
-          <AnimatedPressable
-            style={styles.deleteButton}
-            onPress={handleDelete}
-            scaleValue={0.96}
-          >
-            <Ionicons name="trash-outline" size={18} color={Colors.secondary} />
-            <Text style={styles.deleteButtonText}>Delete</Text>
-          </AnimatedPressable>
-        )}
-      </View>
     </SafeAreaView>
   );
 }
 
+// ─── Styles ───────────────────────────────────────────────────
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -239,153 +283,174 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     color: Colors.secondary,
-    fontSize: 18,
+    fontSize: 16,
   },
-  header: {
+  topBar: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingTop: 8,
+    paddingBottom: 8,
     position: 'absolute',
-    top: 10,
-    left: 10,
+    top: 0,
+    left: 0,
+    right: 0,
     zIndex: 10,
   },
   backButton: {
-    flexDirection: 'row',
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
     alignItems: 'center',
-    gap: 6,
-    backgroundColor: 'rgba(0,0,0,0.6)',
-    paddingHorizontal: Spacing.lg,
-    paddingVertical: Spacing.sm,
-    borderRadius: Radii.pill,
   },
-  backButtonText: {
-    color: Colors.secondary,
-    fontSize: 15,
-    fontWeight: '600',
+  shareButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   image: {
     width: width,
-    height: 400,
-    backgroundColor: '#1a1a1a',
+    height: width * 0.85,
+    backgroundColor: '#1A1A1A',
   },
-  imageIndicator: {
+  dotsContainer: {
     flexDirection: 'row',
     justifyContent: 'center',
-    paddingVertical: Spacing.md,
-    gap: 6,
+    paddingVertical: 10,
   },
   dot: {
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: '#444',
+    backgroundColor: '#333',
+    marginHorizontal: 4,
   },
   activeDot: {
     backgroundColor: Colors.accent,
-    width: 24,
   },
   content: {
-    padding: Spacing.xl,
+    padding: 20,
   },
   categoryBadge: {
     alignSelf: 'flex-start',
-    backgroundColor: Colors.accentSoft,
-    paddingHorizontal: Spacing.md,
-    paddingVertical: 6,
-    borderRadius: Radii.pill,
-    marginBottom: Spacing.md,
+    backgroundColor: 'rgba(30,144,255,0.1)',
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: 12,
     borderWidth: 1,
     borderColor: 'rgba(30,144,255,0.2)',
+    marginBottom: 12,
   },
   categoryText: {
+    fontSize: 12,
     color: Colors.accent,
-    fontSize: 11,
-    fontWeight: '700',
-    textTransform: 'uppercase',
-    letterSpacing: 0.6,
+    fontWeight: '600',
   },
   title: {
-    fontSize: 28,
+    fontSize: 24,
     fontWeight: 'bold',
     color: Colors.secondary,
-    marginBottom: Spacing.lg,
+    marginBottom: 16,
   },
   priceSection: {
-    marginBottom: Spacing.xxl,
+    marginBottom: 20,
   },
   usdPrice: {
-    fontSize: 36,
+    fontSize: 28,
     fontWeight: 'bold',
-    color: Colors.success,
-    marginBottom: Spacing.sm,
+    color: Colors.accent,
+    marginBottom: 6,
   },
   cryptoPrices: {
-    gap: 4,
+    flexDirection: 'row',
+    gap: 16,
   },
   cryptoPrice: {
-    fontSize: 14,
+    fontSize: 13,
     color: Colors.lightGray,
   },
-  divider: {
-    height: 1,
-    backgroundColor: '#2A2A2A',
-    marginVertical: Spacing.xl,
+  sellerSection: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#1A1A1A',
+    padding: 14,
+    borderRadius: Radii.md,
+    marginBottom: 20,
   },
-  sectionTitle: {
-    fontSize: 18,
+  sellerAvatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: Colors.accent,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  sellerAvatarText: {
+    fontSize: 17,
     fontWeight: 'bold',
     color: Colors.secondary,
-    marginBottom: Spacing.md,
   },
-  description: {
-    fontSize: 16,
-    color: Colors.lightGray,
-    lineHeight: 24,
+  sellerInfo: {
+    flex: 1,
+  },
+  sellerLabel: {
+    fontSize: 11,
+    color: '#666',
+    fontWeight: '500',
   },
   sellerName: {
     fontSize: 16,
+    fontWeight: '600',
     color: Colors.secondary,
-    marginBottom: 4,
   },
-  listedDate: {
+  descriptionLabel: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: Colors.secondary,
+    marginBottom: 8,
+  },
+  description: {
     fontSize: 14,
     color: Colors.lightGray,
+    lineHeight: 22,
+    marginBottom: 24,
   },
-  footer: {
-    flexDirection: 'row',
-    padding: Spacing.lg,
-    gap: Spacing.md,
-    borderTopWidth: 1,
-    borderTopColor: '#2A2A2A',
-    backgroundColor: Colors.primary,
-  },
-  shareButton: {
-    flex: 1,
+  // ✅ NEW: Message Seller button style
+  messageButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: Spacing.sm,
     backgroundColor: Colors.accent,
-    paddingVertical: Spacing.lg,
+    paddingVertical: 16,
     borderRadius: Radii.md,
-    ...Shadows.glow(Colors.accent),
+    gap: 8,
+    ...Shadows.md,
   },
-  shareButtonText: {
-    color: Colors.secondary,
+  messageButtonText: {
     fontSize: 16,
     fontWeight: 'bold',
+    color: Colors.secondary,
   },
   deleteButton: {
-    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: Spacing.sm,
-    backgroundColor: Colors.danger,
-    paddingVertical: Spacing.lg,
+    backgroundColor: 'rgba(255,68,68,0.1)',
+    paddingVertical: 16,
     borderRadius: Radii.md,
+    borderWidth: 1,
+    borderColor: 'rgba(255,68,68,0.3)',
+    gap: 8,
   },
   deleteButtonText: {
-    color: Colors.secondary,
     fontSize: 16,
     fontWeight: 'bold',
+    color: '#FF4444',
   },
 });

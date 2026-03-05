@@ -27,7 +27,6 @@ export interface CryptoPrice {
 }
 
 // ─── CoinGecko Response Shape ────────────────────────────────
-// Matches: GET /simple/price?ids=bitcoin,ethereum&vs_currencies=usd&include_24hr_change=true
 export interface CoinGeckoSimplePriceResponse {
   bitcoin: {
     usd: number;
@@ -43,7 +42,36 @@ export interface CoinGeckoSimplePriceResponse {
 export interface CryptoPrices {
   btcPrice: number;
   ethPrice: number;
-  btcChange24h: number;   // percent, e.g. 2.5 means +2.5%
+  btcChange24h: number;
   ethChange24h: number;
-  lastUpdated: number;    // Date.now() timestamp
+  lastUpdated: number;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// MESSAGING TYPES
+// ═══════════════════════════════════════════════════════════════
+
+/** Firestore document shape for a conversation */
+export interface Conversation {
+  id: string;
+  /** Both user IDs — always sorted alphabetically for deterministic lookup */
+  participants: [string, string];
+  /** Map of userId → display name (avoids secondary user reads) */
+  participantNames: Record<string, string>;
+  /** Denormalized for the conversation list preview */
+  lastMessage: string;
+  lastMessageSenderId: string;
+  lastUpdated: any; // Firestore Timestamp
+  /** The product that initiated this conversation */
+  productId: string;
+  productTitle: string;
+}
+
+/** Firestore document shape for a message (subcollection of conversation) */
+export interface Message {
+  id: string;
+  senderId: string;
+  content: string;
+  timestamp: any; // Firestore Timestamp
+  read: boolean;
 }
