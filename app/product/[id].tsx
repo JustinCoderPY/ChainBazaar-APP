@@ -9,23 +9,32 @@ import {
     Share,
     StyleSheet,
     Text,
-    TouchableOpacity,
     View,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../../constants/Colors';
-import { getCryptoPrices } from '../../services/coinGeckoApi';
-import { deleteListing, getAllListings } from '../../services/firebaseService';
+import { Shadows, Radii, Spacing } from '../../constants/theme';
+import { getCryptoPrices } from '../../services/cryptoPriceService';
+import { getAllListings, deleteListing } from '../../services/firebaseService'; // ✅
 import { Product } from '../../types';
+import AnimatedPressable from '../../components/AnimatedPressable';
+import { useAuth } from '../../context/AuthContext';
 
 const { width } = Dimensions.get('window');
 
 export default function ProductDetailsScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
+  const { user } = useAuth();   
   const [product, setProduct] = useState<Product | null>(null);
-  const [btcPrice, setBtcPrice] = useState(67000);
-  const [ethPrice, setEthPrice] = useState(1950);
+  const [btcPrice, setBtcPrice] = useState(97000);
+  const [ethPrice, setEthPrice] = useState(2700);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  
+  const isOwner =
+    !!user?.id &&
+    !!product?.sellerId &&
+    product.sellerId === user.id;
 
   useEffect(() => {
     loadProduct();
@@ -47,10 +56,12 @@ export default function ProductDetailsScreen() {
   };
 
   const loadCryptoPrices = async () => {
+    try {
     const prices = await getCryptoPrices();
-    if (prices) {
-      setBtcPrice(prices.bitcoin.usd);
-      setEthPrice(prices.ethereum.usd);
+      setBtcPrice(prices.btcPrice);
+      setEthPrice(prices.ethPrice);
+    } catch (error) {
+      console.error('Error loading prices:', error);
     }
   };
 
@@ -105,7 +116,8 @@ export default function ProductDetailsScreen() {
   const btcAmount = (product.price / btcPrice).toFixed(8);
   const ethAmount = (product.price / ethPrice).toFixed(8);
 
-  const images = product.imageUrls && product.imageUrls.length > 0
+  const images =
+    product.imageUrls && product.imageUrls.length > 0
     ? product.imageUrls
     : ['https://picsum.photos/400'];
 
@@ -113,12 +125,14 @@ export default function ProductDetailsScreen() {
     <SafeAreaView style={styles.container}>
       <ScrollView>
         <View style={styles.header}>
-          <TouchableOpacity 
+          <AnimatedPressable
             style={styles.backButton}
             onPress={() => router.back()}
+            scaleValue={0.9}
           >
-            <Text style={styles.backButtonText}>← Back</Text>
-          </TouchableOpacity>
+            <Ionicons name="arrow-back" size={20} color={Colors.secondary} />
+            <Text style={styles.backButtonText}>Back</Text>
+          </AnimatedPressable>
         </View>
 
         <ScrollView 
@@ -164,8 +178,12 @@ export default function ProductDetailsScreen() {
           <View style={styles.priceSection}>
             <Text style={styles.usdPrice}>${product.price.toFixed(2)}</Text>
             <View style={styles.cryptoPrices}>
-              <Text style={styles.cryptoPrice}>₿ {btcAmount} BTC</Text>
-              <Text style={styles.cryptoPrice}>Ξ {ethAmount} ETH</Text>
+              <Text style={styles.cryptoPrice}>
+                <Ionicons name="logo-bitcoin" size={13} color={Colors.btcOrange} /> {btcAmount} BTC
+              </Text>
+              <Text style={styles.cryptoPrice}>
+                <Ionicons name="diamond-outline" size={13} color={Colors.ethPurple} /> {ethAmount} ETH
+              </Text>
             </View>
           </View>
 
@@ -177,27 +195,33 @@ export default function ProductDetailsScreen() {
           <View style={styles.divider} />
 
           <Text style={styles.sectionTitle}>Seller Information</Text>
-          <Text style={styles.sellerName}>{product.sellerName}</Text>
+          <Text style={styles.sellerName}>{product.sellerName || 'Unknown Seller'}</Text>
           <Text style={styles.listedDate}>
-            Listed on {new Date(product.createdAt).toLocaleDateString()}
+            Listed on {product.createdAt ? new Date(product.createdAt).toLocaleDateString() : 'Unknown date'}
           </Text>
         </View>
       </ScrollView>
 
       <View style={styles.footer}>
-        <TouchableOpacity 
+        <AnimatedPressable
           style={styles.shareButton}
           onPress={handleShare}
+          scaleValue={0.96}
         >
-          <Text style={styles.shareButtonText}>📤 Share</Text>
-        </TouchableOpacity>
+          <Ionicons name="share-outline" size={18} color={Colors.secondary} />
+          <Text style={styles.shareButtonText}>Share</Text>
+        </AnimatedPressable>
 
-        <TouchableOpacity 
-          style={styles.deleteButton}
-          onPress={handleDelete}
-        >
-          <Text style={styles.deleteButtonText}>🗑️ Delete</Text>
-        </TouchableOpacity>
+        {isOwner && (
+          <AnimatedPressable
+            style={styles.deleteButton}
+            onPress={handleDelete}
+            scaleValue={0.96}
+          >
+            <Ionicons name="trash-outline" size={18} color={Colors.secondary} />
+            <Text style={styles.deleteButtonText}>Delete</Text>
+          </AnimatedPressable>
+        )}
       </View>
     </SafeAreaView>
   );
@@ -224,15 +248,18 @@ const styles = StyleSheet.create({
     zIndex: 10,
   },
   backButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
     backgroundColor: 'rgba(0,0,0,0.6)',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
+    paddingHorizontal: Spacing.lg,
+    paddingVertical: Spacing.sm,
+    borderRadius: Radii.pill,
   },
   backButtonText: {
     color: Colors.secondary,
-    fontSize: 16,
-    fontWeight: 'bold',
+    fontSize: 15,
+    fontWeight: '600',
   },
   image: {
     width: width,
@@ -242,7 +269,7 @@ const styles = StyleSheet.create({
   imageIndicator: {
     flexDirection: 'row',
     justifyContent: 'center',
-    paddingVertical: 12,
+    paddingVertical: Spacing.md,
     gap: 6,
   },
   dot: {
@@ -256,36 +283,39 @@ const styles = StyleSheet.create({
     width: 24,
   },
   content: {
-    padding: 20,
+    padding: Spacing.xl,
   },
   categoryBadge: {
     alignSelf: 'flex-start',
-    backgroundColor: Colors.gray,
-    paddingHorizontal: 12,
+    backgroundColor: Colors.accentSoft,
+    paddingHorizontal: Spacing.md,
     paddingVertical: 6,
-    borderRadius: 12,
-    marginBottom: 12,
+    borderRadius: Radii.pill,
+    marginBottom: Spacing.md,
+    borderWidth: 1,
+    borderColor: 'rgba(30,144,255,0.2)',
   },
   categoryText: {
-    color: Colors.lightGray,
-    fontSize: 12,
-    fontWeight: 'bold',
+    color: Colors.accent,
+    fontSize: 11,
+    fontWeight: '700',
     textTransform: 'uppercase',
+    letterSpacing: 0.6,
   },
   title: {
     fontSize: 28,
     fontWeight: 'bold',
     color: Colors.secondary,
-    marginBottom: 16,
+    marginBottom: Spacing.lg,
   },
   priceSection: {
-    marginBottom: 24,
+    marginBottom: Spacing.xxl,
   },
   usdPrice: {
     fontSize: 36,
     fontWeight: 'bold',
     color: Colors.success,
-    marginBottom: 8,
+    marginBottom: Spacing.sm,
   },
   cryptoPrices: {
     gap: 4,
@@ -296,14 +326,14 @@ const styles = StyleSheet.create({
   },
   divider: {
     height: 1,
-    backgroundColor: '#333',
-    marginVertical: 20,
+    backgroundColor: '#2A2A2A',
+    marginVertical: Spacing.xl,
   },
   sectionTitle: {
     fontSize: 18,
     fontWeight: 'bold',
     color: Colors.secondary,
-    marginBottom: 12,
+    marginBottom: Spacing.md,
   },
   description: {
     fontSize: 16,
@@ -321,18 +351,22 @@ const styles = StyleSheet.create({
   },
   footer: {
     flexDirection: 'row',
-    padding: 16,
-    gap: 12,
+    padding: Spacing.lg,
+    gap: Spacing.md,
     borderTopWidth: 1,
-    borderTopColor: '#333',
+    borderTopColor: '#2A2A2A',
     backgroundColor: Colors.primary,
   },
   shareButton: {
     flex: 1,
-    backgroundColor: Colors.accent,
-    paddingVertical: 16,
-    borderRadius: 8,
+    flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
+    gap: Spacing.sm,
+    backgroundColor: Colors.accent,
+    paddingVertical: Spacing.lg,
+    borderRadius: Radii.md,
+    ...Shadows.glow(Colors.accent),
   },
   shareButtonText: {
     color: Colors.secondary,
@@ -341,10 +375,13 @@ const styles = StyleSheet.create({
   },
   deleteButton: {
     flex: 1,
-    backgroundColor: Colors.danger,
-    paddingVertical: 16,
-    borderRadius: 8,
+    flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
+    gap: Spacing.sm,
+    backgroundColor: Colors.danger,
+    paddingVertical: Spacing.lg,
+    borderRadius: Radii.md,
   },
   deleteButtonText: {
     color: Colors.secondary,

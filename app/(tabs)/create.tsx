@@ -2,22 +2,25 @@ import * as ImagePicker from 'expo-image-picker';
 import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import {
-    Alert,
-    Image,
-    KeyboardAvoidingView,
-    Platform,
-    SafeAreaView,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  Alert,
+  Image,
+  KeyboardAvoidingView,
+  Platform,
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../../constants/Colors';
-import { addProduct } from '../../services/storage';
-import { Product } from '../../types';
-import { useAuth } from '../AuthContext';
+import { Shadows, Radii, Spacing } from '../../constants/theme';
+import { useAuth } from '../../context/AuthContext';
+import AnimatedPressable from '../../components/AnimatedPressable';
+
+// ✅ Firebase functions (your backend)
+import { createListing, uploadImage } from '../../services/firebaseService';
 
 const CATEGORIES = ['Electronics', 'Clothing', 'Home', 'Sports', 'Books', 'Other'];
 
@@ -28,8 +31,8 @@ export default function CreateListingScreen() {
   const [category, setCategory] = useState('Electronics');
   const [images, setImages] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
-  
-  const { user } = useAuth();
+
+  const { user, isGuest } = useAuth();
   const router = useRouter();
 
   const requestPermission = async () => {
@@ -57,8 +60,8 @@ export default function CreateListingScreen() {
       });
 
       if (!result.canceled) {
-        const newImages = result.assets.map(asset => asset.uri);
-        setImages(prev => [...prev, ...newImages]);
+        const newImages = result.assets.map((asset) => asset.uri);
+        setImages((prev) => [...prev, ...newImages]);
       }
     } catch (error) {
       console.error('Error picking image:', error);
@@ -67,11 +70,18 @@ export default function CreateListingScreen() {
   };
 
   const removeImage = (index: number) => {
-    setImages(prev => prev.filter((_, i) => i !== index));
+    setImages((prev) => prev.filter((_, i) => i !== index));
   };
 
   const handleSubmit = async () => {
-    // Validation
+    if (isGuest) {
+      Alert.alert('Login Required', 'Please login to create a listing', [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Login', onPress: () => router.push('/auth/login') },
+      ]);
+      return;
+    }
+
     if (!title.trim()) {
       Alert.alert('Error', 'Please enter a title');
       return;
@@ -92,34 +102,33 @@ export default function CreateListingScreen() {
     setLoading(true);
 
     try {
-      // Since we're using local storage, we'll skip Firebase image upload
-      // and use placeholder or local image URIs
-      console.log('Creating listing with images...');
-      const uploadedImageUrls = images; // Use image URIs directly
+      // ✅ Upload images to Firebase Storage, store download URLs
+      const uploadedImageUrls: string[] = [];
 
-      // Create product object
-      const newProduct: Product = {
-        id: `product_${Date.now()}`,
+      for (let i = 0; i < images.length; i++) {
+        const filename = `${user?.id || 'user'}_${Date.now()}_${i}.jpg`;
+        const downloadURL = await uploadImage(images[i], filename);
+        uploadedImageUrls.push(downloadURL);
+      }
+
+      // ✅ Create listing in Firestore
+      const newListing = {
         title: title.trim(),
         description: description.trim(),
         price: parseFloat(price),
         category,
         imageUrls: uploadedImageUrls,
-        sellerId: user?.id || 'guest',
-        sellerName: user?.name || 'Guest User',
+        sellerId: user!.id,
+        sellerName: user!.name,
         createdAt: new Date().toISOString(),
       };
 
-      // Save to local storage
-      console.log('Saving listing to storage...');
-      await addProduct(newProduct);
-      console.log('Listing saved successfully!');
+      await createListing(newListing);
 
       Alert.alert('Success!', 'Your listing has been created! 🎉', [
         {
           text: 'OK',
           onPress: () => {
-            // Reset form
             setTitle('');
             setDescription('');
             setPrice('');
@@ -129,9 +138,9 @@ export default function CreateListingScreen() {
           },
         },
       ]);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error creating listing:', error);
-      Alert.alert('Error', 'Failed to create listing. Please try again.');
+      Alert.alert('Error', `Failed to create listing: ${error?.message ?? 'Unknown error'}`);
     } finally {
       setLoading(false);
     }
@@ -145,9 +154,9 @@ export default function CreateListingScreen() {
       >
         <ScrollView style={styles.scrollView}>
           <View style={styles.header}>
-            <TouchableOpacity onPress={() => router.back()}>
+            <AnimatedPressable onPress={() => router.back()} scaleValue={0.95}>
               <Text style={styles.cancelButton}>Cancel</Text>
-            </TouchableOpacity>
+            </AnimatedPressable>
             <Text style={styles.headerTitle}>Create Listing</Text>
             <View style={{ width: 60 }} />
           </View>
@@ -155,32 +164,34 @@ export default function CreateListingScreen() {
           <View style={styles.form}>
             <Text style={styles.subtitle}>List your item for sale</Text>
 
-            {/* Image Picker Section */}
+            {/* Image Picker */}
             <Text style={styles.label}>Photos *</Text>
-            <ScrollView 
-              horizontal 
+            <ScrollView
+              horizontal
               showsHorizontalScrollIndicator={false}
               style={styles.imageScrollContainer}
             >
               {images.map((uri, index) => (
                 <View key={index} style={styles.imageContainer}>
                   <Image source={{ uri }} style={styles.uploadedImage} />
-                  <TouchableOpacity
+                  <AnimatedPressable
                     style={styles.removeImageButton}
                     onPress={() => removeImage(index)}
+                    scaleValue={0.85}
                   >
-                    <Text style={styles.removeImageText}>✕</Text>
-                  </TouchableOpacity>
+                    <Ionicons name="close" size={16} color={Colors.secondary} />
+                  </AnimatedPressable>
                 </View>
               ))}
-              
-              <TouchableOpacity 
+
+              <AnimatedPressable
                 style={styles.addImageButton}
                 onPress={pickImage}
+                scaleValue={0.95}
               >
-                <Text style={styles.addImageIcon}>📷</Text>
+                <Ionicons name="camera-outline" size={28} color={Colors.lightGray} />
                 <Text style={styles.addImageText}>Add Photo</Text>
-              </TouchableOpacity>
+              </AnimatedPressable>
             </ScrollView>
 
             {/* Title */}
@@ -223,13 +234,14 @@ export default function CreateListingScreen() {
             <Text style={styles.label}>Category *</Text>
             <View style={styles.categoryContainer}>
               {CATEGORIES.map((cat) => (
-                <TouchableOpacity
+                <AnimatedPressable
                   key={cat}
                   style={[
                     styles.categoryButton,
                     category === cat && styles.categoryButtonActive,
                   ]}
                   onPress={() => setCategory(cat)}
+                  scaleValue={0.93}
                 >
                   <Text
                     style={[
@@ -239,20 +251,21 @@ export default function CreateListingScreen() {
                   >
                     {cat}
                   </Text>
-                </TouchableOpacity>
+                </AnimatedPressable>
               ))}
             </View>
 
-            {/* Submit Button */}
-            <TouchableOpacity
+            {/* Submit */}
+            <AnimatedPressable
               style={[styles.submitButton, loading && styles.submitButtonDisabled]}
               onPress={handleSubmit}
               disabled={loading}
+              scaleValue={0.96}
             >
               <Text style={styles.submitButtonText}>
-                {loading ? 'Uploading...' : '🚀 Create Listing'}
+                {loading ? 'Uploading...' : 'Create Listing'}
               </Text>
-            </TouchableOpacity>
+            </AnimatedPressable>
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -272,8 +285,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
+    paddingHorizontal: Spacing.xl,
+    paddingVertical: Spacing.lg,
     borderBottomWidth: 1,
     borderBottomColor: '#333',
   },
@@ -288,31 +301,31 @@ const styles = StyleSheet.create({
     color: Colors.secondary,
   },
   form: {
-    padding: 20,
+    padding: Spacing.xl,
   },
   subtitle: {
     fontSize: 14,
     color: Colors.lightGray,
-    marginBottom: 24,
+    marginBottom: Spacing.xxl,
   },
   label: {
     fontSize: 16,
     fontWeight: 'bold',
     color: Colors.secondary,
-    marginBottom: 8,
-    marginTop: 16,
+    marginBottom: Spacing.sm,
+    marginTop: Spacing.lg,
   },
   imageScrollContainer: {
-    marginBottom: 8,
+    marginBottom: Spacing.sm,
   },
   imageContainer: {
-    marginRight: 12,
+    marginRight: Spacing.md,
     position: 'relative',
   },
   uploadedImage: {
     width: 120,
     height: 120,
-    borderRadius: 8,
+    borderRadius: Radii.sm,
     backgroundColor: Colors.gray,
   },
   removeImageButton: {
@@ -326,15 +339,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  removeImageText: {
-    color: Colors.secondary,
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
   addImageButton: {
     width: 120,
     height: 120,
-    borderRadius: 8,
+    borderRadius: Radii.sm,
     backgroundColor: Colors.gray,
     borderWidth: 2,
     borderColor: '#444',
@@ -342,20 +350,17 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  addImageIcon: {
-    fontSize: 32,
-    marginBottom: 4,
-  },
   addImageText: {
     color: Colors.lightGray,
     fontSize: 12,
     fontWeight: '600',
+    marginTop: Spacing.xs,
   },
   input: {
     backgroundColor: Colors.gray,
     color: Colors.secondary,
-    padding: 16,
-    borderRadius: 8,
+    padding: Spacing.lg,
+    borderRadius: Radii.sm,
     fontSize: 16,
     borderWidth: 1,
     borderColor: '#333',
@@ -368,10 +373,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: Colors.gray,
-    borderRadius: 8,
+    borderRadius: Radii.sm,
     borderWidth: 1,
     borderColor: '#333',
-    paddingLeft: 16,
+    paddingLeft: Spacing.lg,
   },
   dollarSign: {
     fontSize: 20,
@@ -382,18 +387,18 @@ const styles = StyleSheet.create({
   priceInput: {
     flex: 1,
     color: Colors.secondary,
-    padding: 16,
+    padding: Spacing.lg,
     fontSize: 16,
   },
   categoryContainer: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 12,
+    gap: Spacing.md,
   },
   categoryButton: {
-    paddingHorizontal: 20,
+    paddingHorizontal: Spacing.xl,
     paddingVertical: 10,
-    borderRadius: 20,
+    borderRadius: Radii.pill,
     backgroundColor: Colors.gray,
     borderWidth: 1,
     borderColor: '#444',
@@ -413,13 +418,14 @@ const styles = StyleSheet.create({
   submitButton: {
     backgroundColor: Colors.success,
     padding: 18,
-    borderRadius: 12,
+    borderRadius: Radii.md,
     alignItems: 'center',
-    marginTop: 32,
-    marginBottom: 40,
+    marginTop: Spacing.xxxl,
+    marginBottom: Spacing.huge,
+    ...Shadows.glow(Colors.success),
   },
   submitButtonDisabled: {
-    opacity: 0.5,
+    opacity: 0.45,
   },
   submitButtonText: {
     color: Colors.secondary,

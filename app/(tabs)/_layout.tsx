@@ -1,30 +1,96 @@
-import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
-import { Stack } from 'expo-router';
-import { StatusBar } from 'expo-status-bar';
-import 'react-native-reanimated';
+import { Tabs } from 'expo-router';
+import { Platform, StyleSheet, View } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { Colors } from '@/constants/Colors';
 
-import { useColorScheme } from '@/hooks/use-color-scheme';
-import { AuthProvider } from '../AuthContext';
+// ─── Icon Mapping ────────────────────────────────────────────
+//
+// Tab name      Active icon              Inactive icon
+// ──────────    ────────────────         ────────────────
+// Explore       compass                  compass-outline
+// Messages      chatbubbles              chatbubbles-outline
+// Sell          add-circle               add-circle-outline
+// Profile       person-circle            person-circle-outline
 
-export const unstable_settings = {
-  anchor: '(tabs)',
+type IoniconsName = keyof typeof Ionicons.glyphMap;
+
+const TAB_ICONS: Record<string, { active: IoniconsName; inactive: IoniconsName }> = {
+  index:    { active: 'compass',         inactive: 'compass-outline' },
+  messages: { active: 'chatbubbles',     inactive: 'chatbubbles-outline' },
+  create:   { active: 'add-circle',      inactive: 'add-circle-outline' },
+  profile:  { active: 'person-circle',   inactive: 'person-circle-outline' },
 };
 
-export default function RootLayout() {
-  const colorScheme = useColorScheme();
-
+export default function TabLayout() {
   return (
-    <AuthProvider>
-      <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-        <Stack>
-          <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-          <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
-          <Stack.Screen name="auth/login" options={{ presentation: 'modal', title: 'Login' }} />
-          <Stack.Screen name="auth/signup" options={{ presentation: 'modal', title: 'Sign Up' }} />
-          <Stack.Screen name="product/[id]" options={{ headerShown: false }} />
-        </Stack>
-        <StatusBar style="auto" />
-      </ThemeProvider>
-    </AuthProvider>
+    <Tabs
+      screenOptions={({ route }) => ({
+        headerShown: false,
+        tabBarIcon: ({ focused, color, size }) => {
+          const icons = TAB_ICONS[route.name];
+          if (!icons) return null;
+          const iconName = focused ? icons.active : icons.inactive;
+          return <Ionicons name={iconName} size={26} color={color} />;
+        },
+        tabBarActiveTintColor: Colors.accent,
+        tabBarInactiveTintColor: '#666666',
+        tabBarLabelStyle: styles.tabLabel,
+        tabBarStyle: styles.tabBar,
+        tabBarItemStyle: styles.tabItem,
+      })}
+    >
+      <Tabs.Screen
+        name="index"
+        options={{
+          title: 'Explore',
+        }}
+      />
+      <Tabs.Screen
+        name="messages"
+        options={{
+          title: 'Messages',
+        }}
+      />
+      <Tabs.Screen
+        name="create"
+        options={{
+          title: 'Sell',
+        }}
+      />
+      <Tabs.Screen
+        name="profile"
+        options={{
+          title: 'Profile',
+        }}
+      />
+      {/* Hide the old explore tab from the Expo template */}
+      <Tabs.Screen
+        name="explore"
+        options={{
+          href: null,    // Hides from tab bar without deleting the file
+        }}
+      />
+    </Tabs>
   );
 }
+
+const styles = StyleSheet.create({
+  tabBar: {
+    backgroundColor: '#121212',
+    borderTopWidth: 1,
+    borderTopColor: '#1E1E1E',
+    height: Platform.OS === 'ios' ? 88 : 68,
+    paddingTop: 6,
+    paddingBottom: Platform.OS === 'ios' ? 28 : 10,
+    elevation: 0,           // Remove Android shadow
+    shadowOpacity: 0,       // Remove iOS shadow
+  },
+  tabLabel: {
+    fontSize: 11,
+    fontWeight: '600',
+    marginTop: 2,
+  },
+  tabItem: {
+    paddingVertical: 4,
+  },
+});

@@ -1,19 +1,19 @@
 import React, { useState } from 'react';
 import {
-  View,
-  Text,
-  TextInput,
-  StyleSheet,
-  TouchableOpacity,
-  ScrollView,
-  Image,
   Alert,
+  Image,
   KeyboardAvoidingView,
   Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 import { Colors } from '../constants/Colors';
+import { createListing } from '../services/firebaseService';
 import { Product } from '../types';
-import { addProduct } from '../services/storage';
 
 const CATEGORIES = ['Electronics', 'Clothing', 'Home', 'Sports', 'Books', 'Other'];
 
@@ -49,14 +49,14 @@ export default function CreateListingScreen() {
       description: description.trim(),
       price: Number(price),
       category,
-      imageUrl: imageUrl.trim() || `https://picsum.photos/seed/${Date.now()}/400/300`,
+      imageUrls: imageUrl.trim() ? [imageUrl.trim()] : [`https://picsum.photos/seed/${Date.now()}/400/300`],
       sellerId: 'user123', // TODO: Replace with actual user ID
       sellerName: 'Current User', // TODO: Replace with actual user name
       createdAt: new Date().toISOString(),
     };
 
     try {
-      await addProduct(newProduct);
+      await createListing(newProduct);
       
       Alert.alert(
         'Success! 🎉',
