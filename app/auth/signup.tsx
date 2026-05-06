@@ -9,6 +9,7 @@ import {
   SafeAreaView,
   KeyboardAvoidingView,
   Platform,
+  ScrollView,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Colors } from '../../constants/Colors';
@@ -43,66 +44,72 @@ export default function SignupScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <KeyboardAvoidingView 
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        style={styles.content}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        style={styles.keyboardView}
       >
-        <TouchableOpacity 
-          style={styles.closeButton}
-          onPress={() => router.back()}
+        <ScrollView
+          contentContainerStyle={styles.content}
+          keyboardShouldPersistTaps="always"
+          showsVerticalScrollIndicator={false}
         >
-          <Text style={styles.closeText}>✕</Text>
-        </TouchableOpacity>
-
-        <Text style={styles.title}>Create Account</Text>
-        <Text style={styles.subtitle}>Join ChainBazaar</Text>
-
-        <View style={styles.form}>
-          <TextInput
-            style={styles.input}
-            placeholder="Full Name"
-            placeholderTextColor={Colors.lightGray}
-            value={name}
-            onChangeText={setName}
-          />
-
-          <TextInput
-            style={styles.input}
-            placeholder="Email"
-            placeholderTextColor={Colors.lightGray}
-            value={email}
-            onChangeText={setEmail}
-            autoCapitalize="none"
-            keyboardType="email-address"
-          />
-
-          <TextInput
-            style={styles.input}
-            placeholder="Password (min 6 characters)"
-            placeholderTextColor={Colors.lightGray}
-            value={password}
-            onChangeText={setPassword}
-            secureTextEntry
-          />
-
-          <TouchableOpacity
-            style={styles.button}
-            onPress={handleSignup}
-            disabled={loading}
-          >
-            <Text style={styles.buttonText}>
-              {loading ? 'Creating account...' : 'Sign Up'}
-            </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
+          <TouchableOpacity 
+            style={styles.closeButton}
             onPress={() => router.back()}
-            style={styles.linkButton}
           >
-            <Text style={styles.linkText}>
-              Already have an account? <Text style={styles.linkBold}>Login</Text>
-            </Text>
+            <Text style={styles.closeText}>✕</Text>
           </TouchableOpacity>
-        </View>
+
+          <Text style={styles.title}>Create Account</Text>
+          <Text style={styles.subtitle}>Join ChainBazaar</Text>
+
+          <View style={styles.form}>
+            <TextInput
+              style={styles.input}
+              placeholder="Full Name"
+              placeholderTextColor={Colors.lightGray}
+              value={name}
+              onChangeText={setName}
+            />
+
+            <TextInput
+              style={styles.input}
+              placeholder="Email"
+              placeholderTextColor={Colors.lightGray}
+              value={email}
+              onChangeText={setEmail}
+              autoCapitalize="none"
+              keyboardType="email-address"
+            />
+
+            <TextInput
+              style={styles.input}
+              placeholder="Password (min 6 characters)"
+              placeholderTextColor={Colors.lightGray}
+              value={password}
+              onChangeText={setPassword}
+              secureTextEntry
+            />
+
+            <TouchableOpacity
+              style={styles.button}
+              onPress={handleSignup}
+              disabled={loading}
+            >
+              <Text style={styles.buttonText}>
+                {loading ? 'Creating account...' : 'Sign Up'}
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              onPress={() => router.back()}
+              style={styles.linkButton}
+            >
+              <Text style={styles.linkText}>
+                Already have an account? <Text style={styles.linkBold}>Login</Text>
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
@@ -113,8 +120,11 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: Colors.primary,
   },
-  content: {
+  keyboardView: {
     flex: 1,
+  },
+  content: {
+    flexGrow: 1,
     padding: 24,
     justifyContent: 'center',
   },

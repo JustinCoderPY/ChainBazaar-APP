@@ -9,6 +9,7 @@ import {
   SafeAreaView,
   KeyboardAvoidingView,
   Platform,
+  ScrollView,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Colors } from '../../constants/Colors';
@@ -42,58 +43,64 @@ export default function LoginScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <KeyboardAvoidingView 
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        style={styles.content}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        style={styles.keyboardView}
       >
-        <TouchableOpacity 
-          style={styles.closeButton}
-          onPress={() => router.back()}
+        <ScrollView
+          contentContainerStyle={styles.content}
+          keyboardShouldPersistTaps="always"
+          showsVerticalScrollIndicator={false}
         >
-          <Text style={styles.closeText}>✕</Text>
-        </TouchableOpacity>
-
-        <Text style={styles.title}>Welcome Back!</Text>
-        <Text style={styles.subtitle}>Login to ChainBazaar</Text>
-
-        <View style={styles.form}>
-          <TextInput
-            style={styles.input}
-            placeholder="Email"
-            placeholderTextColor={Colors.lightGray}
-            value={email}
-            onChangeText={setEmail}
-            autoCapitalize="none"
-            keyboardType="email-address"
-          />
-
-          <TextInput
-            style={styles.input}
-            placeholder="Password"
-            placeholderTextColor={Colors.lightGray}
-            value={password}
-            onChangeText={setPassword}
-            secureTextEntry
-          />
-
-          <TouchableOpacity
-            style={styles.button}
-            onPress={handleLogin}
-            disabled={loading}
+          <TouchableOpacity 
+            style={styles.closeButton}
+            onPress={() => router.back()}
           >
-            <Text style={styles.buttonText}>
-              {loading ? 'Logging in...' : 'Login'}
-            </Text>
+            <Text style={styles.closeText}>✕</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity
-            onPress={() => router.push('/auth/signup')}
-            style={styles.linkButton}
-          >
-            <Text style={styles.linkText}>
-              Don't have an account? <Text style={styles.linkBold}>Sign up</Text>
-            </Text>
-          </TouchableOpacity>
-        </View>
+          <Text style={styles.title}>Welcome Back!</Text>
+          <Text style={styles.subtitle}>Login to ChainBazaar</Text>
+
+          <View style={styles.form}>
+            <TextInput
+              style={styles.input}
+              placeholder="Email"
+              placeholderTextColor={Colors.lightGray}
+              value={email}
+              onChangeText={setEmail}
+              autoCapitalize="none"
+              keyboardType="email-address"
+            />
+
+            <TextInput
+              style={styles.input}
+              placeholder="Password"
+              placeholderTextColor={Colors.lightGray}
+              value={password}
+              onChangeText={setPassword}
+              secureTextEntry
+            />
+
+            <TouchableOpacity
+              style={styles.button}
+              onPress={handleLogin}
+              disabled={loading}
+            >
+              <Text style={styles.buttonText}>
+                {loading ? 'Logging in...' : 'Login'}
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              onPress={() => router.push('/auth/signup')}
+              style={styles.linkButton}
+            >
+              <Text style={styles.linkText}>
+                {"Don't have an account? "}<Text style={styles.linkBold}>Sign up</Text>
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
@@ -104,8 +111,11 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: Colors.primary,
   },
-  content: {
+  keyboardView: {
     flex: 1,
+  },
+  content: {
+    flexGrow: 1,
     padding: 24,
     justifyContent: 'center',
   },
