@@ -13,7 +13,7 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Colors } from '../../constants/Colors';
-import { useAuth } from '../AuthContext';
+import { useAuth } from '../../context/AuthContext';
 
 export default function SignupScreen() {
   const [name, setName] = useState('');
