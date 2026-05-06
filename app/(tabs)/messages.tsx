@@ -1,5 +1,8 @@
-import React from 'react';
+import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
+import { useEffect, useState } from 'react';
 import {
+  ActivityIndicator,
   FlatList,
   SafeAreaView,
   StyleSheet,
@@ -7,91 +10,31 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { useRouter } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../../constants/Colors';
 import { useAuth } from '../../context/AuthContext';
-
-// ─── Types ──────────────────────────────────────────────────
-interface Conversation {
-  id: string;
-  userName: string;
-  avatarLetter: string;
-  avatarColor: string;
-  lastMessage: string;
-  timestamp: string;
-  unreadCount: number;
-  /** Whether the last message was sent by the current user */
-  isOwnMessage: boolean;
-}
-
-// ─── Mock Data ──────────────────────────────────────────────
-const MOCK_CONVERSATIONS: Conversation[] = [
-  {
-    id: 'conv_1',
-    userName: 'Sarah Miller',
-    avatarLetter: 'S',
-    avatarColor: '#1E90FF',
-    lastMessage: 'Is the iPhone 14 Pro still available?',
-    timestamp: '2m ago',
-    unreadCount: 2,
-    isOwnMessage: false,
-  },
-  {
-    id: 'conv_2',
-    userName: 'Alex Chen',
-    avatarLetter: 'A',
-    avatarColor: '#16C784',
-    lastMessage: 'Yeah I can do $1,750 for the laptop. Deal?',
-    timestamp: '15m ago',
-    unreadCount: 1,
-    isOwnMessage: false,
-  },
-  {
-    id: 'conv_3',
-    userName: 'Mike Johnson',
-    avatarLetter: 'M',
-    avatarColor: '#F7931A',
-    lastMessage: 'Sent you the tracking number',
-    timestamp: '1h ago',
-    unreadCount: 0,
-    isOwnMessage: true,
-  },
-  {
-    id: 'conv_4',
-    userName: 'Emma Watson',
-    avatarLetter: 'E',
-    avatarColor: '#A78BFA',
-    lastMessage: 'Can you ship to New York?',
-    timestamp: '3h ago',
-    unreadCount: 0,
-    isOwnMessage: false,
-  },
-  {
-    id: 'conv_5',
-    userName: 'David Lee',
-    avatarLetter: 'D',
-    avatarColor: '#EA3943',
-    lastMessage: 'Payment confirmed. Thanks!',
-    timestamp: '1d ago',
-    unreadCount: 0,
-    isOwnMessage: false,
-  },
-  {
-    id: 'conv_6',
-    userName: 'Lisa Brown',
-    avatarLetter: 'L',
-    avatarColor: '#6366F1',
-    lastMessage: 'Would you accept 0.015 BTC?',
-    timestamp: '2d ago',
-    unreadCount: 0,
-    isOwnMessage: false,
-  },
-];
+import { listenToConversations } from '../../services/messageService';
+import { Conversation } from '../../types';
 
 export default function MessagesScreen() {
-  const { isGuest } = useAuth();
+  const { isGuest, user } = useAuth();
   const router = useRouter();
+  const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  // ─── Subscribe to real-time conversations ──────────────────
+  useEffect(() => {
+    if (isGuest || !user?.id) {
+      setLoading(false);
+      return;
+    }
+
+    const unsubscribe = listenToConversations(user.id, (convos) => {
+      setConversations(convos);
+      setLoading(false);
+    });
+
+    return () => unsubscribe();
+  }, [isGuest, user?.id]);
 
   // ─── Guest State ──────────────────────────────────────────
   if (isGuest) {
@@ -117,51 +60,74 @@ export default function MessagesScreen() {
     );
   }
 
-  // ─── Render Conversation Item ─────────────────────────────
-  const renderItem = ({ item }: { item: Conversation }) => (
-    <TouchableOpacity
-      style={styles.conversationItem}
-      activeOpacity={0.6}
-      onPress={() => router.push(`/chat/${item.id}?name=${encodeURIComponent(item.userName)}&color=${encodeURIComponent(item.avatarColor)}`)}
-    >
-      {/* Avatar */}
-      <View style={[styles.avatar, { backgroundColor: item.avatarColor }]}>
-        <Text style={styles.avatarText}>{item.avatarLetter}</Text>
-      </View>
+  // ─── Helper: get the other user's name ─────────────────────
+  const getOtherUserName = (conv: Conversation): string => {
+    if (!user?.id || !conv.participantNames) return 'User';
+    const otherUserId = conv.participants.find((p) => p !== user.id);
+    return otherUserId ? (conv.participantNames[otherUserId] || 'User') : 'User';
+  };
 
-      {/* Content */}
-      <View style={styles.conversationContent}>
-        <View style={styles.conversationTopRow}>
-          <Text style={styles.userName} numberOfLines={1}>
-            {item.userName}
-          </Text>
-          <Text style={[
-            styles.timestamp,
-            item.unreadCount > 0 && styles.timestampUnread,
-          ]}>
-            {item.timestamp}
+  // ─── Helper: format timestamp ──────────────────────────────
+  const formatTimestamp = (ts: any): string => {
+    if (!ts?.toDate) return '';
+    const date = ts.toDate();
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMs / 3600000);
+    const diffDays = Math.floor(diffMs / 86400000);
+
+    if (diffMins < 1) return 'just now';
+    if (diffMins < 60) return `${diffMins}m ago`;
+    if (diffHours < 24) return `${diffHours}h ago`;
+    if (diffDays < 7) return `${diffDays}d ago`;
+    return date.toLocaleDateString();
+  };
+
+  // ─── Render Conversation Item ─────────────────────────────
+  const renderItem = ({ item }: { item: Conversation }) => {
+    const otherName = getOtherUserName(item);
+    const avatarLetter = otherName.charAt(0).toUpperCase();
+    const isOwnMessage = item.lastMessageSenderId === user?.id;
+
+    return (
+      <TouchableOpacity
+        style={styles.conversationItem}
+        activeOpacity={0.6}
+        onPress={() =>
+          router.push(
+            `/chat/${item.id}?name=${encodeURIComponent(otherName)}`
+          )
+        }
+      >
+        {/* Avatar */}
+        <View style={[styles.avatar, { backgroundColor: Colors.accent }]}>
+          <Text style={styles.avatarText}>{avatarLetter}</Text>
+        </View>
+
+        {/* Content */}
+        <View style={styles.conversationContent}>
+          <View style={styles.conversationTopRow}>
+            <Text style={styles.userName} numberOfLines={1}>
+              {otherName}
+            </Text>
+            <Text style={styles.timestamp}>
+              {formatTimestamp(item.lastUpdated)}
+            </Text>
+          </View>
+          <View style={styles.conversationBottomRow}>
+            <Text style={styles.productLabel} numberOfLines={1}>
+              {item.productTitle}
+            </Text>
+          </View>
+          <Text style={styles.lastMessage} numberOfLines={1}>
+            {isOwnMessage ? 'You: ' : ''}
+            {item.lastMessage || 'No messages yet'}
           </Text>
         </View>
-        <View style={styles.conversationBottomRow}>
-          <Text
-            style={[
-              styles.lastMessage,
-              item.unreadCount > 0 && styles.lastMessageUnread,
-            ]}
-            numberOfLines={1}
-          >
-            {item.isOwnMessage ? 'You: ' : ''}
-            {item.lastMessage}
-          </Text>
-          {item.unreadCount > 0 && (
-            <View style={styles.unreadBadge}>
-              <Text style={styles.unreadBadgeText}>{item.unreadCount}</Text>
-            </View>
-          )}
-        </View>
-      </View>
-    </TouchableOpacity>
-  );
+      </TouchableOpacity>
+    );
+  };
 
   const renderSeparator = () => <View style={styles.separator} />;
 
@@ -170,27 +136,30 @@ export default function MessagesScreen() {
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Messages</Text>
-        <Text style={styles.headerCount}>
-          {MOCK_CONVERSATIONS.filter(c => c.unreadCount > 0).length} unread
-        </Text>
       </View>
 
-      <FlatList
-        data={MOCK_CONVERSATIONS}
-        keyExtractor={(item) => item.id}
-        renderItem={renderItem}
-        ItemSeparatorComponent={renderSeparator}
-        contentContainerStyle={styles.list}
-        ListEmptyComponent={
-          <View style={styles.emptyContainer}>
-            <Ionicons name="chatbubbles-outline" size={56} color="#333" />
-            <Text style={styles.emptyText}>No conversations yet</Text>
-            <Text style={styles.emptySubtext}>
-              Messages from buyers and sellers will appear here
-            </Text>
-          </View>
-        }
-      />
+      {loading ? (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator color={Colors.accent} size="large" />
+        </View>
+      ) : (
+        <FlatList
+          data={conversations}
+          keyExtractor={(item) => item.id}
+          renderItem={renderItem}
+          ItemSeparatorComponent={renderSeparator}
+          contentContainerStyle={styles.list}
+          ListEmptyComponent={
+            <View style={styles.emptyContainer}>
+              <Ionicons name="chatbubbles-outline" size={56} color="#333" />
+              <Text style={styles.emptyText}>No conversations yet</Text>
+              <Text style={styles.emptySubtext}>
+                Messages from buyers and sellers will appear here
+              </Text>
+            </View>
+          }
+        />
+      )}
     </SafeAreaView>
   );
 }
@@ -200,6 +169,11 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: Colors.primary,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 
   // ── Header ──
@@ -217,11 +191,6 @@ const styles = StyleSheet.create({
     fontSize: 28,
     fontWeight: 'bold',
     color: Colors.secondary,
-  },
-  headerCount: {
-    fontSize: 13,
-    color: Colors.accent,
-    fontWeight: '600',
   },
 
   // ── List ──
@@ -261,7 +230,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 4,
+    marginBottom: 2,
   },
   userName: {
     fontSize: 16,
@@ -274,37 +243,17 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#555',
   },
-  timestampUnread: {
-    color: Colors.accent,
-  },
   conversationBottomRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    marginBottom: 2,
+  },
+  productLabel: {
+    fontSize: 12,
+    color: Colors.accent,
+    fontWeight: '500',
   },
   lastMessage: {
     fontSize: 14,
     color: '#666',
-    flex: 1,
-    marginRight: 8,
-  },
-  lastMessageUnread: {
-    color: Colors.lightGray,
-    fontWeight: '500',
-  },
-  unreadBadge: {
-    backgroundColor: Colors.accent,
-    minWidth: 20,
-    height: 20,
-    borderRadius: 10,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 6,
-  },
-  unreadBadgeText: {
-    color: Colors.secondary,
-    fontSize: 11,
-    fontWeight: 'bold',
   },
 
   // ── Empty / Guest ──

@@ -1,5 +1,8 @@
-import React, { useRef, useEffect } from 'react';
+import { Ionicons } from '@expo/vector-icons';
+import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
+  ActivityIndicator,
   FlatList,
   KeyboardAvoidingView,
   Platform,
@@ -10,102 +13,114 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../../constants/Colors';
-
-// ─── Types ──────────────────────────────────────────────────
-interface Message {
-  id: string;
-  text: string;
-  sender: 'me' | 'them';
-  timestamp: string;
-}
-
-// ─── Mock Messages (keyed by conversation ID) ───────────────
-const MOCK_MESSAGES: Record<string, Message[]> = {
-  conv_1: [
-    { id: '1', text: 'Hi! I saw your iPhone 14 Pro listing', sender: 'them', timestamp: '10:30 AM' },
-    { id: '2', text: 'Hey! Yes, it\'s still available', sender: 'me', timestamp: '10:32 AM' },
-    { id: '3', text: 'What condition is it in?', sender: 'them', timestamp: '10:33 AM' },
-    { id: '4', text: 'Excellent condition. Only had it for 6 months. Comes with original box and charger.', sender: 'me', timestamp: '10:35 AM' },
-    { id: '5', text: 'Would you take $850?', sender: 'them', timestamp: '10:36 AM' },
-    { id: '6', text: 'I can do $900, that\'s the lowest I\'d go', sender: 'me', timestamp: '10:38 AM' },
-    { id: '7', text: 'Is the iPhone 14 Pro still available?', sender: 'them', timestamp: '10:40 AM' },
-  ],
-  conv_2: [
-    { id: '1', text: 'Hey, interested in the gaming laptop', sender: 'them', timestamp: '9:00 AM' },
-    { id: '2', text: 'Sure! It\'s an RTX 3080, 32GB RAM, 1TB SSD', sender: 'me', timestamp: '9:05 AM' },
-    { id: '3', text: 'Nice specs. Listed at $1,899 right?', sender: 'them', timestamp: '9:06 AM' },
-    { id: '4', text: 'Yes, negotiable though', sender: 'me', timestamp: '9:08 AM' },
-    { id: '5', text: 'Yeah I can do $1,750 for the laptop. Deal?', sender: 'them', timestamp: '9:10 AM' },
-  ],
-  conv_3: [
-    { id: '1', text: 'Hey, the watch shipped today!', sender: 'me', timestamp: 'Yesterday' },
-    { id: '2', text: 'Awesome, what carrier?', sender: 'them', timestamp: 'Yesterday' },
-    { id: '3', text: 'FedEx. Should arrive in 2-3 days', sender: 'me', timestamp: 'Yesterday' },
-    { id: '4', text: 'Sent you the tracking number', sender: 'me', timestamp: 'Yesterday' },
-  ],
-  conv_4: [
-    { id: '1', text: 'Hi, love the vintage camera listing!', sender: 'them', timestamp: 'Yesterday' },
-    { id: '2', text: 'Thanks! It\'s a beauty', sender: 'me', timestamp: 'Yesterday' },
-    { id: '3', text: 'Can you ship to New York?', sender: 'them', timestamp: 'Yesterday' },
-  ],
-  conv_5: [
-    { id: '1', text: 'Just sent the ETH payment', sender: 'them', timestamp: '2 days ago' },
-    { id: '2', text: 'Got it! I\'ll ship the sunglasses today', sender: 'me', timestamp: '2 days ago' },
-    { id: '3', text: 'Payment confirmed. Thanks!', sender: 'them', timestamp: '2 days ago' },
-  ],
-  conv_6: [
-    { id: '1', text: 'Interested in the mechanical keyboard', sender: 'them', timestamp: '3 days ago' },
-    { id: '2', text: 'It\'s Cherry MX Blue switches, RGB backlit', sender: 'me', timestamp: '3 days ago' },
-    { id: '3', text: 'Would you accept 0.015 BTC?', sender: 'them', timestamp: '3 days ago' },
-  ],
-};
+import { useAuth } from '../../context/AuthContext';
+import {
+  listenToMessages,
+  markMessagesAsRead,
+  sendMessage,
+} from '../../services/messageService';
+import { Message } from '../../types';
 
 export default function ChatScreen() {
-  const { id, name, color } = useLocalSearchParams<{
+  const { id, name } = useLocalSearchParams<{
     id: string;
     name: string;
-    color: string;
   }>();
   const router = useRouter();
+  const { user } = useAuth();
   const flatListRef = useRef<FlatList>(null);
 
-  const messages = MOCK_MESSAGES[id as string] || [];
-  const otherUserName = name || 'User';
-  const avatarColor = color || Colors.accent;
-  const avatarLetter = otherUserName.charAt(0).toUpperCase();
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [inputText, setInputText] = useState('');
+  const [sending, setSending] = useState(false);
+  const [loading, setLoading] = useState(true);
 
-  // Scroll to bottom on mount
+  const conversationId = id as string;
+  const otherUserName = name || 'User';
+
+  // ─── Subscribe to real-time messages ──────────────────────
   useEffect(() => {
-    if (messages.length > 0) {
+    if (!conversationId) return;
+
+    const unsubscribe = listenToMessages(conversationId, (msgs) => {
+      setMessages(msgs);
+      setLoading(false);
+
+      // Scroll to bottom when new messages arrive
       setTimeout(() => {
-        flatListRef.current?.scrollToEnd({ animated: false });
+        flatListRef.current?.scrollToEnd({ animated: true });
       }, 100);
+    });
+
+    return () => unsubscribe();
+  }, [conversationId]);
+
+  // ─── Mark messages as read when screen opens ──────────────
+  useEffect(() => {
+    if (!conversationId || !user?.id) return;
+
+    markMessagesAsRead(conversationId, user.id).catch((err) =>
+      console.error('[ChatScreen] markMessagesAsRead error:', err)
+    );
+  }, [conversationId, user?.id, messages.length]);
+
+  // ─── Send handler ──────────────────────────────────────────
+  const handleSend = useCallback(async () => {
+    if (!inputText.trim() || sending || !user?.id) return;
+
+    const text = inputText.trim();
+    setInputText(''); // Clear immediately for UX
+    setSending(true);
+
+    try {
+      await sendMessage(conversationId, user.id, text);
+    } catch (error) {
+      console.error('[ChatScreen] Error sending message:', error);
+      setInputText(text); // Restore on failure
+    } finally {
+      setSending(false);
     }
-  }, []);
+  }, [inputText, sending, user?.id, conversationId]);
 
   // ─── Render Message Bubble ────────────────────────────────
   const renderMessage = ({ item }: { item: Message }) => {
-    const isMe = item.sender === 'me';
+    const isMe = item.senderId === user?.id;
 
     return (
       <View style={[styles.bubbleRow, isMe && styles.bubbleRowMe]}>
-        {/* Other user's avatar (only for their messages) */}
-        {!isMe && (
-          <View style={[styles.bubbleAvatar, { backgroundColor: avatarColor }]}>
-            <Text style={styles.bubbleAvatarText}>{avatarLetter}</Text>
+        <View
+          style={[
+            styles.bubble,
+            isMe ? styles.bubbleMe : styles.bubbleThem,
+          ]}
+        >
+          <Text
+            style={[
+              styles.bubbleText,
+              isMe ? styles.bubbleTextMe : styles.bubbleTextThem,
+            ]}
+          >
+            {item.content}
+          </Text>
+          <View style={styles.bubbleMeta}>
+            <Text style={[styles.timeText, isMe && styles.timeTextMe]}>
+              {item.timestamp?.toDate
+                ? item.timestamp.toDate().toLocaleTimeString([], {
+                    hour: '2-digit',
+                    minute: '2-digit',
+                  })
+                : ''}
+            </Text>
+            {isMe && (
+              <Ionicons
+                name={item.read ? 'checkmark-done' : 'checkmark'}
+                size={14}
+                color={item.read ? '#4ADE80' : '#888'}
+                style={{ marginLeft: 4 }}
+              />
+            )}
           </View>
-        )}
-
-        <View style={[styles.bubble, isMe ? styles.bubbleMe : styles.bubbleThem]}>
-          <Text style={[styles.bubbleText, isMe ? styles.bubbleTextMe : styles.bubbleTextThem]}>
-            {item.text}
-          </Text>
-          <Text style={[styles.bubbleTime, isMe && styles.bubbleTimeMe]}>
-            {item.timestamp}
-          </Text>
         </View>
       </View>
     );
@@ -114,11 +129,10 @@ export default function ChatScreen() {
   // ─── Render ───────────────────────────────────────────────
   return (
     <>
-      {/* Dynamic header configured via Expo Router's Stack.Screen */}
       <Stack.Screen
         options={{
           title: otherUserName,
-          headerStyle: { backgroundColor: '#121212' },
+          headerStyle: { backgroundColor: Colors.primary },
           headerTintColor: '#FFFFFF',
           headerShadowVisible: false,
           headerBackTitle: 'Back',
@@ -132,14 +146,32 @@ export default function ChatScreen() {
           keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
         >
           {/* Messages */}
-          <FlatList
-            ref={flatListRef}
-            data={messages}
-            keyExtractor={(item) => item.id}
-            renderItem={renderMessage}
-            contentContainerStyle={styles.messageList}
-            showsVerticalScrollIndicator={false}
-          />
+          {loading ? (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator color={Colors.accent} size="large" />
+            </View>
+          ) : (
+            <FlatList
+              ref={flatListRef}
+              data={messages}
+              keyExtractor={(item) => item.id}
+              renderItem={renderMessage}
+              contentContainerStyle={styles.messageList}
+              showsVerticalScrollIndicator={false}
+              ListEmptyComponent={
+                <View style={styles.emptyContainer}>
+                  <Ionicons name="chatbubble-ellipses-outline" size={48} color="#333" />
+                  <Text style={styles.emptyText}>No messages yet</Text>
+                  <Text style={styles.emptySubtext}>
+                    Say hello to start the conversation!
+                  </Text>
+                </View>
+              }
+              onContentSizeChange={() =>
+                flatListRef.current?.scrollToEnd({ animated: false })
+              }
+            />
+          )}
 
           {/* Input Bar */}
           <View style={styles.inputBar}>
@@ -147,16 +179,26 @@ export default function ChatScreen() {
               style={styles.textInput}
               placeholder="Type a message..."
               placeholderTextColor="#555"
-              editable={false}
+              value={inputText}
+              onChangeText={setInputText}
+              multiline
+              maxLength={1000}
+              returnKeyType="default"
             />
             <TouchableOpacity
-              style={styles.sendButton}
+              style={[
+                styles.sendButton,
+                (!inputText.trim() || sending) && styles.sendButtonDisabled,
+              ]}
               activeOpacity={0.7}
-              onPress={() => {
-                // Non-functional — placeholder for future implementation
-              }}
+              onPress={handleSend}
+              disabled={!inputText.trim() || sending}
             >
-              <Ionicons name="send" size={20} color={Colors.secondary} />
+              {sending ? (
+                <ActivityIndicator color={Colors.secondary} size="small" />
+              ) : (
+                <Ionicons name="send" size={20} color={Colors.secondary} />
+              )}
             </TouchableOpacity>
           </View>
         </KeyboardAvoidingView>
@@ -174,45 +216,47 @@ const styles = StyleSheet.create({
   keyboardView: {
     flex: 1,
   },
-
-  // ── Message List ──
-  messageList: {
-    paddingHorizontal: 16,
-    paddingTop: 16,
-    paddingBottom: 8,
-  },
-
-  // ── Bubble Layout ──
-  bubbleRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    marginBottom: 12,
-    maxWidth: '85%',
-  },
-  bubbleRowMe: {
-    alignSelf: 'flex-end',
-    flexDirection: 'row-reverse',
-  },
-  bubbleAvatar: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
+  loadingContainer: {
+    flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 8,
   },
-  bubbleAvatarText: {
-    fontSize: 12,
-    fontWeight: 'bold',
-    color: Colors.secondary,
+  emptyContainer: {
+    alignItems: 'center',
+    marginTop: 100,
+    paddingHorizontal: 40,
+  },
+  emptyText: {
+    fontSize: 18,
+    color: Colors.lightGray,
+    fontWeight: '600',
+    marginTop: 16,
+    marginBottom: 4,
+  },
+  emptySubtext: {
+    fontSize: 13,
+    color: '#555',
+    textAlign: 'center',
+  },
+  messageList: {
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    flexGrow: 1,
   },
 
-  // ── Bubble Styles ──
+  // ── Bubbles ──
+  bubbleRow: {
+    flexDirection: 'row',
+    marginBottom: 8,
+  },
+  bubbleRowMe: {
+    justifyContent: 'flex-end',
+  },
   bubble: {
+    maxWidth: '78%',
     paddingHorizontal: 14,
     paddingVertical: 10,
     borderRadius: 18,
-    maxWidth: '100%',
   },
   bubbleMe: {
     backgroundColor: Colors.accent,
@@ -232,20 +276,24 @@ const styles = StyleSheet.create({
   bubbleTextThem: {
     color: Colors.secondary,
   },
-  bubbleTime: {
+  bubbleMeta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    marginTop: 4,
+  },
+  timeText: {
     fontSize: 10,
     color: '#888',
-    marginTop: 4,
-    alignSelf: 'flex-end',
   },
-  bubbleTimeMe: {
+  timeTextMe: {
     color: 'rgba(255,255,255,0.6)',
   },
 
   // ── Input Bar ──
   inputBar: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-end',
     paddingHorizontal: 12,
     paddingVertical: 10,
     borderTopWidth: 1,
@@ -256,13 +304,14 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#1A1A1A',
     color: Colors.secondary,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
     borderRadius: 20,
+    paddingHorizontal: 16,
+    paddingTop: 10,
+    paddingBottom: 10,
     fontSize: 15,
+    maxHeight: 100,
     borderWidth: 1,
     borderColor: '#2A2A2A',
-    marginRight: 10,
   },
   sendButton: {
     width: 40,
@@ -271,5 +320,9 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.accent,
     justifyContent: 'center',
     alignItems: 'center',
+    marginLeft: 8,
+  },
+  sendButtonDisabled: {
+    opacity: 0.4,
   },
 });
