@@ -1,11 +1,21 @@
 import { addDoc, collection, deleteDoc, doc, getDocs, orderBy, query, where } from 'firebase/firestore';
 import { getDownloadURL, ref, uploadBytes } from 'firebase/storage';
+import { Platform } from 'react-native';
 import { auth, db, storage } from '../config/firebase';
 import { Product } from '../types';
 
 
 type FirebaseLikeError = {
   code?: string;
+  message?: string;
+  name?: string;
+  serverResponse?: string;
+};
+
+type WebUploadFile = Blob & {
+  name?: string;
+  type: string;
+  size: number;
 };
 
 type FirestoreDocLike = {
@@ -89,16 +99,64 @@ const getUserListingsByField = async (userId: string, ownerField: ProductOwnerFi
   return querySnapshot.docs;
 };
 
-// Upload image to Firebase Storage
-export const uploadImage = async (uri: string, filename: string): Promise<string> => {
-  try {
-    const response = await fetch(uri);
-    const blob = await response.blob();
-    const storageRef = ref(storage, `listings/${filename}`);
+const logFirebaseStorageError = (error: unknown) => {
+  const firebaseError = error as FirebaseLikeError | null;
+  console.error('[Storage] uploadBytes failed:', error);
+  console.error('[Storage] Firebase error code:', firebaseError?.code ?? 'unknown');
+  console.error('[Storage] Firebase error message:', firebaseError?.message ?? 'unknown');
+  if (firebaseError?.name) {
+    console.error('[Storage] Firebase error name:', firebaseError.name);
+  }
+  if (firebaseError?.serverResponse) {
+    console.error('[Storage] Firebase server response:', firebaseError.serverResponse);
+  }
+};
 
-    await uploadBytes(storageRef, blob);
+const fetchImageBlob = async (uri: string): Promise<Blob> => {
+  const response = await fetch(uri);
+  console.log('[Storage] fetch response status:', response.status);
+
+  if (!response.ok) {
+    throw new Error(`Image fetch failed with status ${response.status}`);
+  }
+
+  const blob = await response.blob();
+  console.log('[Storage] blob type:', blob.type || 'unknown');
+  console.log('[Storage] blob size:', blob.size);
+  return blob;
+};
+
+// Upload image to Firebase Storage
+export const uploadImage = async (
+  uri: string,
+  filename: string,
+  webFile?: WebUploadFile,
+): Promise<string> => {
+  const storagePath = `listings/${filename}`;
+  console.log('[Storage] uri received:', uri);
+  console.log('[Storage] storage path:', storagePath);
+
+  try {
+    const storageRef = ref(storage, storagePath);
+    const uploadData =
+      Platform.OS === 'web' && webFile
+        ? webFile
+        : await fetchImageBlob(uri);
+
+    console.log('[Storage] blob type:', uploadData.type || 'unknown');
+    console.log('[Storage] blob size:', uploadData.size);
+
+    try {
+      await uploadBytes(storageRef, uploadData, {
+        contentType: uploadData.type || 'image/jpeg',
+      });
+    } catch (error) {
+      logFirebaseStorageError(error);
+      throw error;
+    }
 
     const downloadURL = await getDownloadURL(storageRef);
+    console.log('[Storage] download URL created:', downloadURL);
     return downloadURL;
   } catch (error) {
     console.error('Error uploading image:', error);

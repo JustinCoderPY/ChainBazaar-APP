@@ -26,6 +26,8 @@ const CATEGORIES = ['Electronics', 'Clothing', 'Home', 'Sports', 'Books', 'Other
 const LOGIN_ROUTE = '/auth/login';
 const CREATE_SUCCESS_ROUTE = '/';
 
+type SelectedImage = Pick<ImagePicker.ImagePickerAsset, 'uri' | 'file' | 'fileName' | 'mimeType'>;
+
 const showAlert = (title: string, message: string) => {
   if (Platform.OS === 'web' && typeof window !== 'undefined') {
     window.alert(`${title}\n\n${message}`);
@@ -40,7 +42,7 @@ export default function CreateListingScreen() {
   const [description, setDescription] = useState('');
   const [price, setPrice] = useState('');
   const [category, setCategory] = useState('Electronics');
-  const [images, setImages] = useState<string[]>([]);
+  const [images, setImages] = useState<SelectedImage[]>([]);
   const [loading, setLoading] = useState(false);
 
   const { user, isGuest } = useAuth();
@@ -71,7 +73,12 @@ export default function CreateListingScreen() {
       });
 
       if (!result.canceled) {
-        const newImages = result.assets.map((asset) => asset.uri);
+        const newImages = result.assets.map((asset) => ({
+          uri: asset.uri,
+          file: asset.file,
+          fileName: asset.fileName,
+          mimeType: asset.mimeType,
+        }));
         setImages((prev) => [...prev, ...newImages]);
       }
     } catch (error) {
@@ -129,12 +136,16 @@ export default function CreateListingScreen() {
 
       // ✅ Upload images to Firebase Storage, store download URLs
       const uploadedImageUrls: string[] = [];
-      console.log('Uploading images:', images);
+      console.log('Uploading images:', images.map((image) => image.uri));
 
       for (let i = 0; i < images.length; i++) {
         try {
-          const filename = `${user.id}_${Date.now()}_${i}.jpg`;
-          const downloadURL = await uploadImage(images[i], filename);
+          const extension =
+            images[i].fileName?.split('.').pop() ||
+            images[i].mimeType?.split('/').pop() ||
+            'jpg';
+          const filename = `${user.id}_${Date.now()}_${i}.${extension}`;
+          const downloadURL = await uploadImage(images[i].uri, filename, images[i].file);
           uploadedImageUrls.push(downloadURL);
         } catch (error) {
           console.error('Image upload failed:', error);
@@ -204,7 +215,7 @@ export default function CreateListingScreen() {
             >
               {images.map((uri, index) => (
                 <View key={index} style={styles.imageContainer}>
-                  <Image source={{ uri }} style={styles.uploadedImage} />
+                  <Image source={{ uri: uri.uri }} style={styles.uploadedImage} />
                   <AnimatedPressable
                     style={styles.removeImageButton}
                     onPress={() => removeImage(index)}
