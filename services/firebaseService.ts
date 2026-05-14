@@ -18,6 +18,10 @@ type WebUploadFile = Blob & {
   size: number;
 };
 
+type AuthWithReady = typeof auth & {
+  authStateReady?: () => Promise<void>;
+};
+
 type FirestoreDocLike = {
   id: string;
   data: () => unknown;
@@ -126,6 +130,18 @@ const fetchImageBlob = async (uri: string): Promise<Blob> => {
   return blob;
 };
 
+const ensureFirebaseAuthUser = async () => {
+  if (!auth.currentUser) {
+    await (auth as AuthWithReady).authStateReady?.();
+  }
+
+  if (!auth.currentUser) {
+    throw new Error('Firebase Auth currentUser is null. Cannot upload listing image.');
+  }
+
+  return auth.currentUser;
+};
+
 // Upload image to Firebase Storage
 export const uploadImage = async (
   uri: string,
@@ -137,14 +153,18 @@ export const uploadImage = async (
   console.log('[Storage] storage path:', storagePath);
 
   try {
+    const firebaseUser = await ensureFirebaseAuthUser();
     const storageRef = ref(storage, storagePath);
     const uploadData =
       Platform.OS === 'web' && webFile
         ? webFile
         : await fetchImageBlob(uri);
 
+    console.log('[Storage] auth.currentUser uid:', firebaseUser.uid);
+    console.log('[Storage] auth.currentUser email:', firebaseUser.email);
     console.log('[Storage] blob type:', uploadData.type || 'unknown');
     console.log('[Storage] blob size:', uploadData.size);
+    console.log('[Storage] storage fullPath:', storageRef.fullPath);
 
     try {
       await uploadBytes(storageRef, uploadData, {

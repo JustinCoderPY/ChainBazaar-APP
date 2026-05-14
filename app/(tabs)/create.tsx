@@ -21,12 +21,17 @@ import AnimatedPressable from '../../components/AnimatedPressable';
 
 // ✅ Firebase functions (your backend)
 import { createListing, uploadImage } from '../../services/firebaseService';
+import { auth } from '../../config/firebase';
 
 const CATEGORIES = ['Electronics', 'Clothing', 'Home', 'Sports', 'Books', 'Other'];
 const LOGIN_ROUTE = '/auth/login';
 const CREATE_SUCCESS_ROUTE = '/';
 
 type SelectedImage = Pick<ImagePicker.ImagePickerAsset, 'uri' | 'file' | 'fileName' | 'mimeType'>;
+type UploadErrorLike = {
+  code?: string;
+  message?: string;
+};
 
 const showAlert = (title: string, message: string) => {
   if (Platform.OS === 'web' && typeof window !== 'undefined') {
@@ -139,20 +144,44 @@ export default function CreateListingScreen() {
       console.log('Uploading images:', images.map((image) => image.uri));
 
       for (let i = 0; i < images.length; i++) {
+        const image = images[i];
+        const imageType = image.file?.type || image.mimeType || 'unknown';
+        const imageSize = image.file?.size ?? 0;
+
         try {
           const extension =
-            images[i].fileName?.split('.').pop() ||
-            images[i].mimeType?.split('/').pop() ||
+            image.fileName?.split('.').pop() ||
+            image.mimeType?.split('/').pop() ||
             'jpg';
           const filename = `${user.id}_${Date.now()}_${i}.${extension}`;
-          const downloadURL = await uploadImage(images[i].uri, filename, images[i].file);
+
+          console.log('[Create] useAuth user id before upload:', user?.id);
+          console.log('[Create] isGuest before upload:', isGuest);
+          console.log('[Create] image file type:', imageType);
+          console.log('[Create] image file size:', imageSize);
+
+          const downloadURL = await uploadImage(image.uri, filename, image.file);
           uploadedImageUrls.push(downloadURL);
         } catch (error) {
+          const uploadError = error as UploadErrorLike;
+          const firebaseAuthUid = auth.currentUser?.uid ?? 'null';
+
           console.error('Image upload failed:', error);
           if (Platform.OS !== 'web') {
             throw error;
           }
-          showAlert('Image Upload Failed', 'The listing will be created without the failed image.');
+          showAlert(
+            'Image Upload Failed',
+            [
+              'The listing will be created without the failed image.',
+              '',
+              `Firebase error code: ${uploadError?.code ?? 'unknown'}`,
+              `Firebase message: ${uploadError?.message ?? 'unknown'}`,
+              `File size: ${imageSize}`,
+              `File type: ${imageType}`,
+              `Firebase auth uid: ${firebaseAuthUid}`,
+            ].join('\n')
+          );
         }
       }
 
