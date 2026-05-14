@@ -15,6 +15,18 @@ import { useRouter } from 'expo-router';
 import { Colors } from '../../constants/Colors';
 import { useAuth } from '../../context/AuthContext';
 
+const HOME_ROUTE = '/';
+const LOGIN_ROUTE = '/auth/login';
+
+const showAlert = (title: string, message: string) => {
+  if (Platform.OS === 'web' && typeof window !== 'undefined') {
+    window.alert(`${title}\n\n${message}`);
+    return;
+  }
+
+  Alert.alert(title, message);
+};
+
 export default function SignupScreen() {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -25,7 +37,7 @@ export default function SignupScreen() {
 
   const handleSignup = async () => {
     if (!name || !email || !password) {
-      Alert.alert('Error', 'Please fill in all fields');
+      showAlert('Error', 'Please fill in all fields');
       return;
     }
 
@@ -34,10 +46,10 @@ export default function SignupScreen() {
     setLoading(false);
 
     if (success) {
-      Alert.alert('Success', 'Account created successfully!');
-      router.back();
+      showAlert('Success', 'Account created successfully!');
+      router.replace(HOME_ROUTE);
     } else {
-      Alert.alert('Error', 'Please check your information');
+      showAlert('Error', 'Please check your information');
     }
   };
 
@@ -54,7 +66,7 @@ export default function SignupScreen() {
         >
           <TouchableOpacity 
             style={styles.closeButton}
-            onPress={() => router.back()}
+            onPress={() => router.replace(HOME_ROUTE)}
           >
             <Text style={styles.closeText}>✕</Text>
           </TouchableOpacity>
@@ -101,7 +113,7 @@ export default function SignupScreen() {
             </TouchableOpacity>
 
             <TouchableOpacity
-              onPress={() => router.back()}
+              onPress={() => router.replace(LOGIN_ROUTE)}
               style={styles.linkButton}
             >
               <Text style={styles.linkText}>

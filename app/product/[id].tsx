@@ -24,6 +24,7 @@ import { Product } from '../../types';
 
 const { width } = Dimensions.get('window');
 const LOGIN_ROUTE = '/auth/login';
+const HOME_ROUTE = '/';
 
 const showAlert = (title: string, message: string) => {
   if (Platform.OS === 'web' && typeof window !== 'undefined') {
@@ -32,6 +33,24 @@ const showAlert = (title: string, message: string) => {
   }
 
   Alert.alert(title, message);
+};
+
+const confirmAction = (title: string, message: string, onConfirm: () => void) => {
+  if (Platform.OS === 'web' && typeof window !== 'undefined') {
+    if (window.confirm(`${title}\n\n${message}`)) {
+      onConfirm();
+    }
+    return;
+  }
+
+  Alert.alert(title, message, [
+    { text: 'Cancel', style: 'cancel' },
+    {
+      text: 'Delete',
+      style: 'destructive',
+      onPress: onConfirm,
+    },
+  ]);
 };
 
 export default function ProductDetailsScreen() {
@@ -79,28 +98,30 @@ export default function ProductDetailsScreen() {
   };
 
   const handleDelete = () => {
-    Alert.alert(
+    confirmAction(
       'Delete Listing',
       'Are you sure you want to delete this listing? This action cannot be undone.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              console.log('Deleting listing from Firebase...');
-              await deleteListing(id as string);
-              Alert.alert('Success', 'Listing deleted successfully');
-              router.back();
-            } catch (error) {
-              console.error('Error deleting listing:', error);
-              Alert.alert('Error', 'Failed to delete listing');
-            }
-          },
-        },
-      ]
+      async () => {
+        try {
+          console.log('Deleting listing from Firebase...');
+          await deleteListing(id as string);
+          showAlert('Success', 'Listing deleted successfully');
+          router.replace(HOME_ROUTE);
+        } catch (error) {
+          console.error('Error deleting listing:', error);
+          showAlert('Error', 'Failed to delete listing');
+        }
+      }
     );
+  };
+
+  const handleBack = () => {
+    if (router.canGoBack()) {
+      router.back();
+      return;
+    }
+
+    router.replace(HOME_ROUTE);
   };
 
   const handleShare = async () => {
@@ -193,7 +214,7 @@ export default function ProductDetailsScreen() {
       <ScrollView showsVerticalScrollIndicator={false}>
         {/* ── Back + Share Bar ─────────────────────────────── */}
         <View style={styles.topBar}>
-          <AnimatedPressable style={styles.backButton} onPress={() => router.back()}>
+          <AnimatedPressable style={styles.backButton} onPress={handleBack}>
             <Ionicons name="arrow-back" size={24} color={Colors.secondary} />
           </AnimatedPressable>
           <AnimatedPressable style={styles.shareButton} onPress={handleShare}>

@@ -15,6 +15,18 @@ import { useRouter } from 'expo-router';
 import { Colors } from '../../constants/Colors';
 import { useAuth } from '../../context/AuthContext';
 
+const HOME_ROUTE = '/';
+const SIGNUP_ROUTE = '/auth/signup';
+
+const showAlert = (title: string, message: string) => {
+  if (Platform.OS === 'web' && typeof window !== 'undefined') {
+    window.alert(`${title}\n\n${message}`);
+    return;
+  }
+
+  Alert.alert(title, message);
+};
+
 export default function LoginScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -24,7 +36,7 @@ export default function LoginScreen() {
 
   const handleLogin = async () => {
     if (!email || !password) {
-      Alert.alert('Error', 'Please fill in all fields');
+      showAlert('Error', 'Please fill in all fields');
       return;
     }
 
@@ -33,10 +45,10 @@ export default function LoginScreen() {
     setLoading(false);
 
     if (success) {
-      Alert.alert('Success', 'Logged in successfully!');
-      router.back();
+      showAlert('Success', 'Logged in successfully!');
+      router.replace(HOME_ROUTE);
     } else {
-      Alert.alert('Error', 'Password must be at least 6 characters');
+      showAlert('Error', 'Password must be at least 6 characters');
     }
   };
 
@@ -53,7 +65,7 @@ export default function LoginScreen() {
         >
           <TouchableOpacity 
             style={styles.closeButton}
-            onPress={() => router.back()}
+            onPress={() => router.replace(HOME_ROUTE)}
           >
             <Text style={styles.closeText}>✕</Text>
           </TouchableOpacity>
@@ -92,7 +104,7 @@ export default function LoginScreen() {
             </TouchableOpacity>
 
             <TouchableOpacity
-              onPress={() => router.push('/auth/signup')}
+              onPress={() => router.replace(SIGNUP_ROUTE)}
               style={styles.linkButton}
             >
               <Text style={styles.linkText}>
