@@ -28,6 +28,7 @@ export default function ProfileScreen() {
   const router = useRouter();
   const [myListings, setMyListings] = useState<Product[]>([]);
   const [refreshing, setRefreshing] = useState(false);
+  const [loggingOut, setLoggingOut] = useState(false);
 
   const loadMyListings = useCallback(async () => {
     if (!user?.id) return;
@@ -59,8 +60,17 @@ export default function ProfileScreen() {
         text: 'Logout',
         style: 'destructive',
         onPress: async () => {
-          await logout();
-          Alert.alert('Success', 'Logged out successfully');
+          setLoggingOut(true);
+          try {
+            await logout();
+            Alert.alert('Success', 'Logged out successfully');
+            router.replace('/auth/login');
+          } catch (error) {
+            console.error('Error logging out:', error);
+            Alert.alert('Error', 'Failed to log out. Please try again.');
+          } finally {
+            setLoggingOut(false);
+          }
         },
       },
     ]);
@@ -140,11 +150,12 @@ export default function ProfileScreen() {
         </View>
 
         <AnimatedPressable
-          style={styles.logoutButton}
+          style={[styles.logoutButton, loggingOut && styles.logoutButtonDisabled]}
           onPress={handleLogout}
+          disabled={loggingOut}
           scaleValue={0.95}
         >
-          <Text style={styles.logoutButtonText}>Logout</Text>
+          <Text style={styles.logoutButtonText}>{loggingOut ? 'Logging out...' : 'Logout'}</Text>
         </AnimatedPressable>
       </View>
 
@@ -283,6 +294,9 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.md,
     borderRadius: Radii.md,
     ...Shadows.md,
+  },
+  logoutButtonDisabled: {
+    opacity: 0.6,
   },
   logoutButtonText: {
     color: Colors.secondary,

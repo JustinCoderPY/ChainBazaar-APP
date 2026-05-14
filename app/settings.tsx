@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   Alert,
   SafeAreaView,
@@ -35,6 +35,7 @@ interface SettingsSection {
 export default function SettingsScreen() {
   const { user, isGuest, logout } = useAuth();
   const router = useRouter();
+  const [loggingOut, setLoggingOut] = useState(false);
 
   // ─── Handlers ───────────────────────────────────────────────
   const handleChangePhoto = () => {
@@ -95,8 +96,17 @@ export default function SettingsScreen() {
           text: 'Logout',
           style: 'destructive',
           onPress: async () => {
-            await logout();
-            router.replace('/auth/login');
+            setLoggingOut(true);
+            try {
+              await logout();
+              Alert.alert('Success', 'Logged out successfully');
+              router.replace('/auth/login');
+            } catch (error) {
+              console.error('Error logging out:', error);
+              Alert.alert('Error', 'Failed to log out. Please try again.');
+            } finally {
+              setLoggingOut(false);
+            }
           },
         },
       ]
@@ -187,8 +197,13 @@ export default function SettingsScreen() {
   const renderItem = (item: SettingsItem, isLast: boolean) => (
     <AnimatedPressable
       key={item.id}
-      style={[styles.item, isLast && styles.itemLast]}
+      style={[
+        styles.item,
+        isLast && styles.itemLast,
+        item.id === 'logout' && loggingOut && styles.itemDisabled,
+      ]}
       onPress={item.onPress}
+      disabled={item.id === 'logout' && loggingOut}
       scaleValue={0.98}
     >
       {/* Icon */}
@@ -199,7 +214,7 @@ export default function SettingsScreen() {
       {/* Label + subtitle */}
       <View style={styles.itemContent}>
         <Text style={[styles.itemLabel, item.destructive && styles.itemLabelDestructive]}>
-          {item.label}
+          {item.id === 'logout' && loggingOut ? 'Logging out...' : item.label}
         </Text>
         {item.subtitle && (
           <Text style={styles.itemSubtitle}>{item.subtitle}</Text>
@@ -350,6 +365,9 @@ const styles = StyleSheet.create({
   },
   itemLast: {
     borderBottomWidth: 0,
+  },
+  itemDisabled: {
+    opacity: 0.6,
   },
   iconContainer: {
     width: 36,

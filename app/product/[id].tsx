@@ -106,13 +106,21 @@ export default function ProductDetailsScreen() {
 
   // ✅ NEW: Message Seller handler
   const handleMessageSeller = async () => {
-    if (!product || !user?.id) return;
-
-    if (isGuest) {
+    if (isGuest || !user?.id) {
       Alert.alert('Login Required', 'Please login to message sellers', [
         { text: 'Cancel', style: 'cancel' },
         { text: 'Login', onPress: () => router.push('/auth/login') },
       ]);
+      return;
+    }
+
+    if (!product) {
+      Alert.alert('Error', 'Listing details are still loading. Please try again.');
+      return;
+    }
+
+    if (!product.sellerId) {
+      Alert.alert('Error', 'This listing is missing seller information.');
       return;
     }
 

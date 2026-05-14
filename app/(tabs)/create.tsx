@@ -90,7 +90,8 @@ export default function CreateListingScreen() {
       Alert.alert('Error', 'Please enter a description');
       return;
     }
-    if (!price || parseFloat(price) <= 0) {
+    const numericPrice = Number(price);
+    if (!price.trim() || !Number.isFinite(numericPrice) || numericPrice <= 0) {
       Alert.alert('Error', 'Please enter a valid price');
       return;
     }
@@ -102,6 +103,14 @@ export default function CreateListingScreen() {
     setLoading(true);
 
     try {
+      if (!user?.id) {
+        Alert.alert('Login Required', 'Please login to create a listing', [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Login', onPress: () => router.push('/auth/login') },
+        ]);
+        return;
+      }
+
       // ✅ Upload images to Firebase Storage, store download URLs
       const uploadedImageUrls: string[] = [];
 
@@ -115,11 +124,11 @@ export default function CreateListingScreen() {
       const newListing = {
         title: title.trim(),
         description: description.trim(),
-        price: parseFloat(price),
+        price: numericPrice,
         category,
         imageUrls: uploadedImageUrls,
-        sellerId: user!.id,
-        sellerName: user!.name,
+        sellerId: user.id,
+        sellerName: user.name,
         createdAt: new Date().toISOString(),
       };
 

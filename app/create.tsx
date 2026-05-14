@@ -11,7 +11,9 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { useRouter } from 'expo-router';
 import { Colors } from '../constants/Colors';
+import { useAuth } from '../context/AuthContext';
 import { createListing } from '../services/firebaseService';
 import { Product } from '../types';
 
@@ -24,8 +26,18 @@ export default function CreateListingScreen() {
   const [category, setCategory] = useState('Electronics');
   const [imageUrl, setImageUrl] = useState('');
   const [loading, setLoading] = useState(false);
+  const { user, isGuest } = useAuth();
+  const router = useRouter();
 
   const handleSubmit = async () => {
+    if (isGuest || !user?.id) {
+      Alert.alert('Login Required', 'Please login to create a listing', [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Login', onPress: () => router.push('/auth/login') },
+      ]);
+      return;
+    }
+
     // Validation
     if (!title.trim()) {
       Alert.alert('Error', 'Please enter a title');
@@ -35,7 +47,8 @@ export default function CreateListingScreen() {
       Alert.alert('Error', 'Please enter a description');
       return;
     }
-    if (!price || isNaN(Number(price)) || Number(price) <= 0) {
+    const numericPrice = Number(price);
+    if (!price.trim() || !Number.isFinite(numericPrice) || numericPrice <= 0) {
       Alert.alert('Error', 'Please enter a valid price');
       return;
     }
@@ -47,11 +60,11 @@ export default function CreateListingScreen() {
       id: Date.now().toString(),
       title: title.trim(),
       description: description.trim(),
-      price: Number(price),
+      price: numericPrice,
       category,
       imageUrls: imageUrl.trim() ? [imageUrl.trim()] : [`https://picsum.photos/seed/${Date.now()}/400/300`],
-      sellerId: 'user123', // TODO: Replace with actual user ID
-      sellerName: 'Current User', // TODO: Replace with actual user name
+      sellerId: user.id,
+      sellerName: user.name,
       createdAt: new Date().toISOString(),
     };
 
@@ -71,11 +84,13 @@ export default function CreateListingScreen() {
               setPrice('');
               setImageUrl('');
               setCategory('Electronics');
+              router.back();
             },
           },
         ]
       );
     } catch (error) {
+      console.error('Error creating listing:', error);
       Alert.alert('Error', 'Failed to create listing. Please try again.');
     } finally {
       setLoading(false);
