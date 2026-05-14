@@ -63,8 +63,7 @@ export default function ProfileScreen() {
           setLoggingOut(true);
           try {
             await logout();
-            Alert.alert('Success', 'Logged out successfully');
-            router.replace('/auth/login');
+            router.replace({ pathname: '/auth/login' });
           } catch (error) {
             console.error('Error logging out:', error);
             Alert.alert('Error', 'Failed to log out. Please try again.');
