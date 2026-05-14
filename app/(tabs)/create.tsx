@@ -23,6 +23,17 @@ import AnimatedPressable from '../../components/AnimatedPressable';
 import { createListing, uploadImage } from '../../services/firebaseService';
 
 const CATEGORIES = ['Electronics', 'Clothing', 'Home', 'Sports', 'Books', 'Other'];
+const LOGIN_ROUTE = '/auth/login';
+const CREATE_SUCCESS_ROUTE = '/';
+
+const showAlert = (title: string, message: string) => {
+  if (Platform.OS === 'web' && typeof window !== 'undefined') {
+    window.alert(`${title}\n\n${message}`);
+    return;
+  }
+
+  Alert.alert(title, message);
+};
 
 export default function CreateListingScreen() {
   const [title, setTitle] = useState('');
@@ -38,7 +49,7 @@ export default function CreateListingScreen() {
   const requestPermission = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== 'granted') {
-      Alert.alert(
+      showAlert(
         'Permission Required',
         'Please allow access to your photo library to upload images.'
       );
@@ -65,7 +76,7 @@ export default function CreateListingScreen() {
       }
     } catch (error) {
       console.error('Error picking image:', error);
-      Alert.alert('Error', 'Failed to pick image');
+      showAlert('Error', 'Failed to pick image');
     }
   };
 
@@ -74,50 +85,64 @@ export default function CreateListingScreen() {
   };
 
   const handleSubmit = async () => {
+    console.log('Create Listing pressed');
+
     if (isGuest) {
-      Alert.alert('Login Required', 'Please login to create a listing', [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Login', onPress: () => router.push('/auth/login') },
-      ]);
+      showAlert('Login Required', 'Please login to create a listing');
+      router.push(LOGIN_ROUTE);
       return;
     }
 
     if (!title.trim()) {
-      Alert.alert('Error', 'Please enter a title');
+      showAlert('Error', 'Please enter a title');
       return;
     }
     if (!description.trim()) {
-      Alert.alert('Error', 'Please enter a description');
+      showAlert('Error', 'Please enter a description');
       return;
     }
     const numericPrice = Number(price);
     if (!price.trim() || !Number.isFinite(numericPrice) || numericPrice <= 0) {
-      Alert.alert('Error', 'Please enter a valid price');
+      showAlert('Error', 'Please enter a valid price');
       return;
     }
-    if (images.length === 0) {
-      Alert.alert('Error', 'Please add at least one image');
+    if (!category) {
+      showAlert('Error', 'Please select a category');
       return;
     }
+    if (images.length === 0 && Platform.OS !== 'web') {
+      showAlert('Error', 'Please add at least one image');
+      return;
+    }
+
+    console.log('Validation passed');
+    console.log('Current user:', user);
 
     setLoading(true);
 
     try {
       if (!user?.id) {
-        Alert.alert('Login Required', 'Please login to create a listing', [
-          { text: 'Cancel', style: 'cancel' },
-          { text: 'Login', onPress: () => router.push('/auth/login') },
-        ]);
+        showAlert('Login Required', 'Please login to create a listing');
+        router.push(LOGIN_ROUTE);
         return;
       }
 
       // ✅ Upload images to Firebase Storage, store download URLs
       const uploadedImageUrls: string[] = [];
+      console.log('Uploading images:', images);
 
       for (let i = 0; i < images.length; i++) {
-        const filename = `${user?.id || 'user'}_${Date.now()}_${i}.jpg`;
-        const downloadURL = await uploadImage(images[i], filename);
-        uploadedImageUrls.push(downloadURL);
+        try {
+          const filename = `${user.id}_${Date.now()}_${i}.jpg`;
+          const downloadURL = await uploadImage(images[i], filename);
+          uploadedImageUrls.push(downloadURL);
+        } catch (error) {
+          console.error('Image upload failed:', error);
+          if (Platform.OS !== 'web') {
+            throw error;
+          }
+          showAlert('Image Upload Failed', 'The listing will be created without the failed image.');
+        }
       }
 
       // ✅ Create listing in Firestore
@@ -131,25 +156,22 @@ export default function CreateListingScreen() {
         sellerName: user.name,
         createdAt: new Date().toISOString(),
       };
+      console.log('Creating listing payload:', newListing);
 
-      await createListing(newListing);
+      const listingId = await createListing(newListing);
+      console.log('Listing created:', listingId);
 
-      Alert.alert('Success!', 'Your listing has been created! 🎉', [
-        {
-          text: 'OK',
-          onPress: () => {
-            setTitle('');
-            setDescription('');
-            setPrice('');
-            setImages([]);
-            setCategory('Electronics');
-            router.back();
-          },
-        },
-      ]);
+      setTitle('');
+      setDescription('');
+      setPrice('');
+      setImages([]);
+      setCategory('Electronics');
+      showAlert('Success!', 'Your listing has been created!');
+      console.log('Navigating after create:', CREATE_SUCCESS_ROUTE);
+      router.replace(CREATE_SUCCESS_ROUTE);
     } catch (error: any) {
       console.error('Error creating listing:', error);
-      Alert.alert('Error', `Failed to create listing: ${error?.message ?? 'Unknown error'}`);
+      showAlert('Error', `Failed to create listing: ${error?.message ?? 'Unknown error'}`);
     } finally {
       setLoading(false);
     }
@@ -163,7 +185,7 @@ export default function CreateListingScreen() {
       >
         <ScrollView style={styles.scrollView}>
           <View style={styles.header}>
-            <AnimatedPressable onPress={() => router.back()} scaleValue={0.95}>
+            <AnimatedPressable onPress={() => router.replace(CREATE_SUCCESS_ROUTE)} scaleValue={0.95}>
               <Text style={styles.cancelButton}>Cancel</Text>
             </AnimatedPressable>
             <Text style={styles.headerTitle}>Create Listing</Text>

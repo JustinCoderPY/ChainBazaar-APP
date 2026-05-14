@@ -18,6 +18,17 @@ import { createListing } from '../services/firebaseService';
 import { Product } from '../types';
 
 const CATEGORIES = ['Electronics', 'Clothing', 'Home', 'Sports', 'Books', 'Other'];
+const LOGIN_ROUTE = '/auth/login';
+const CREATE_SUCCESS_ROUTE = '/';
+
+const showAlert = (title: string, message: string) => {
+  if (Platform.OS === 'web' && typeof window !== 'undefined') {
+    window.alert(`${title}\n\n${message}`);
+    return;
+  }
+
+  Alert.alert(title, message);
+};
 
 export default function CreateListingScreen() {
   const [title, setTitle] = useState('');
@@ -30,28 +41,36 @@ export default function CreateListingScreen() {
   const router = useRouter();
 
   const handleSubmit = async () => {
+    console.log('Create Listing pressed');
+
     if (isGuest || !user?.id) {
-      Alert.alert('Login Required', 'Please login to create a listing', [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Login', onPress: () => router.push('/auth/login') },
-      ]);
+      showAlert('Login Required', 'Please login to create a listing');
+      router.push(LOGIN_ROUTE);
       return;
     }
 
     // Validation
     if (!title.trim()) {
-      Alert.alert('Error', 'Please enter a title');
+      showAlert('Error', 'Please enter a title');
       return;
     }
     if (!description.trim()) {
-      Alert.alert('Error', 'Please enter a description');
+      showAlert('Error', 'Please enter a description');
       return;
     }
     const numericPrice = Number(price);
     if (!price.trim() || !Number.isFinite(numericPrice) || numericPrice <= 0) {
-      Alert.alert('Error', 'Please enter a valid price');
+      showAlert('Error', 'Please enter a valid price');
       return;
     }
+    if (!category) {
+      showAlert('Error', 'Please select a category');
+      return;
+    }
+
+    console.log('Validation passed');
+    console.log('Current user:', user);
+    console.log('Uploading images:', imageUrl.trim() ? [imageUrl.trim()] : []);
 
     setLoading(true);
 
@@ -67,31 +86,24 @@ export default function CreateListingScreen() {
       sellerName: user.name,
       createdAt: new Date().toISOString(),
     };
+    console.log('Creating listing payload:', newProduct);
 
     try {
-      await createListing(newProduct);
+      const listingId = await createListing(newProduct);
+      console.log('Listing created:', listingId);
       
-      Alert.alert(
-        'Success! 🎉',
-        'Your listing has been created!',
-        [
-          {
-            text: 'OK',
-            onPress: () => {
-              // Reset form
-              setTitle('');
-              setDescription('');
-              setPrice('');
-              setImageUrl('');
-              setCategory('Electronics');
-              router.back();
-            },
-          },
-        ]
-      );
+      setTitle('');
+      setDescription('');
+      setPrice('');
+      setImageUrl('');
+      setCategory('Electronics');
+      showAlert('Success!', 'Your listing has been created!');
+      console.log('Navigating after create:', CREATE_SUCCESS_ROUTE);
+      router.replace(CREATE_SUCCESS_ROUTE);
     } catch (error) {
       console.error('Error creating listing:', error);
-      Alert.alert('Error', 'Failed to create listing. Please try again.');
+      const message = error instanceof Error ? error.message : 'Failed to create listing. Please try again.';
+      showAlert('Error', message);
     } finally {
       setLoading(false);
     }

@@ -5,6 +5,7 @@ import {
   Dimensions,
   FlatList,
   Image,
+  Platform,
   RefreshControl,
   SafeAreaView,
   StyleSheet,
@@ -22,6 +23,34 @@ import { getUserListings } from '../../services/firebaseService';
 
 const { width } = Dimensions.get('window');
 const CARD_WIDTH = (width - 48) / 2;
+const LOGOUT_REDIRECT_ROUTE = '/auth/login';
+
+const confirmAction = (title: string, message: string, onConfirm: () => void) => {
+  if (Platform.OS === 'web' && typeof window !== 'undefined') {
+    if (window.confirm(`${title}\n\n${message}`)) {
+      onConfirm();
+    }
+    return;
+  }
+
+  Alert.alert(title, message, [
+    { text: 'Cancel', style: 'cancel' },
+    {
+      text: 'Logout',
+      style: 'destructive',
+      onPress: onConfirm,
+    },
+  ]);
+};
+
+const showAlert = (title: string, message: string) => {
+  if (Platform.OS === 'web' && typeof window !== 'undefined') {
+    window.alert(`${title}\n\n${message}`);
+    return;
+  }
+
+  Alert.alert(title, message);
+};
 
 export default function ProfileScreen() {
   const { user, logout, isGuest } = useAuth();
@@ -54,25 +83,18 @@ export default function ProfileScreen() {
   };
 
   const handleLogout = () => {
-    Alert.alert('Logout', 'Are you sure you want to logout?', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Logout',
-        style: 'destructive',
-        onPress: async () => {
-          setLoggingOut(true);
-          try {
-            await logout();
-            router.replace({ pathname: '/auth/login' });
-          } catch (error) {
-            console.error('Error logging out:', error);
-            Alert.alert('Error', 'Failed to log out. Please try again.');
-          } finally {
-            setLoggingOut(false);
-          }
-        },
-      },
-    ]);
+    confirmAction('Logout', 'Are you sure you want to logout?', async () => {
+      setLoggingOut(true);
+      try {
+        await logout();
+        router.replace(LOGOUT_REDIRECT_ROUTE);
+      } catch (error) {
+        console.error('Error logging out:', error);
+        showAlert('Error', 'Failed to log out. Please try again.');
+      } finally {
+        setLoggingOut(false);
+      }
+    });
   };
 
   if (isGuest || !user) {

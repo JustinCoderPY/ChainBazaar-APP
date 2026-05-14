@@ -5,6 +5,7 @@ import {
   Alert,
   Dimensions,
   Image,
+  Platform,
   SafeAreaView,
   ScrollView,
   Share,
@@ -22,6 +23,16 @@ import { getOrCreateConversation } from '../../services/messageService'; // ✅ 
 import { Product } from '../../types';
 
 const { width } = Dimensions.get('window');
+const LOGIN_ROUTE = '/auth/login';
+
+const showAlert = (title: string, message: string) => {
+  if (Platform.OS === 'web' && typeof window !== 'undefined') {
+    window.alert(`${title}\n\n${message}`);
+    return;
+  }
+
+  Alert.alert(title, message);
+};
 
 export default function ProductDetailsScreen() {
   const router = useRouter();
@@ -106,26 +117,28 @@ export default function ProductDetailsScreen() {
 
   // ✅ NEW: Message Seller handler
   const handleMessageSeller = async () => {
+    console.log('Message Seller pressed');
+    console.log('Current user:', user);
+    console.log('Seller id:', product?.sellerId);
+
     if (isGuest || !user?.id) {
-      Alert.alert('Login Required', 'Please login to message sellers', [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Login', onPress: () => router.push('/auth/login') },
-      ]);
+      showAlert('Login Required', 'Please login to message sellers');
+      router.push(LOGIN_ROUTE);
       return;
     }
 
     if (!product) {
-      Alert.alert('Error', 'Listing details are still loading. Please try again.');
+      showAlert('Error', 'Listing details are still loading. Please try again.');
       return;
     }
 
     if (!product.sellerId) {
-      Alert.alert('Error', 'This listing is missing seller information.');
+      showAlert('Error', 'This listing is missing seller information.');
       return;
     }
 
     if (isOwner) {
-      Alert.alert('Info', "You can't message yourself!");
+      showAlert('Info', "You can't message yourself!");
       return;
     }
 
@@ -140,13 +153,18 @@ export default function ProductDetailsScreen() {
         product.id,
         product.title,
       );
+      console.log('Conversation created/opened:', conversationId);
 
-      router.push(
-        `/chat/${conversationId}?name=${encodeURIComponent(product.sellerName)}`
-      );
+      const chatRoute = `/chat/${conversationId}?name=${encodeURIComponent(product.sellerName)}`;
+      console.log('Navigating to chat:', chatRoute);
+      router.push({
+        pathname: '/chat/[id]',
+        params: { id: conversationId, name: product.sellerName },
+      });
     } catch (error) {
       console.error('Error creating conversation:', error);
-      Alert.alert('Error', 'Could not start conversation. Please try again.');
+      const message = error instanceof Error ? error.message : 'Could not start conversation. Please try again.';
+      showAlert('Error', message);
     } finally {
       setMessagingLoading(false);
     }
