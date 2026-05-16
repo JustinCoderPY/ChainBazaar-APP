@@ -1,4 +1,3 @@
-```
 rules_version = '2';
 
 service cloud.firestore {
@@ -65,6 +64,20 @@ service cloud.firestore {
     //          listenToConversations()
     // ─────────────────────────────────────────────────────────
     match /conversations/{convId} {
+      function conversationPath() {
+        return /databases/$(database)/documents/conversations/$(convId);
+      }
+
+      function conversationExists() {
+        return exists(conversationPath());
+      }
+
+      function isConversationParticipant() {
+        return request.auth != null
+               && conversationExists()
+               && request.auth.uid in get(conversationPath()).data.participants;
+      }
+
       // Only participants can read conversation metadata
       allow read: if request.auth != null
                   && request.auth.uid in resource.data.participants;
@@ -76,7 +89,8 @@ service cloud.firestore {
 
       // Only participants can update (e.g., lastMessage, lastUpdated)
       allow update: if request.auth != null
-                    && request.auth.uid in resource.data.participants;
+                    && request.auth.uid in resource.data.participants
+                    && request.resource.data.participants == resource.data.participants;
 
       // Conversations cannot be deleted from the client
       allow delete: if false;
@@ -88,18 +102,16 @@ service cloud.firestore {
       // ───────────────────────────────────────────────────────
       match /messages/{messageId} {
         // Only conversation participants can read messages
-        allow read: if request.auth != null
-                    && request.auth.uid in get(/databases/$(database)/documents/conversations/$(convId)).data.participants;
+        allow read: if isConversationParticipant();
 
         // Only participants can create messages, and senderId
         // must match the authenticated user (no spoofing)
         allow create: if request.auth != null
                       && request.resource.data.senderId == request.auth.uid
-                      && request.auth.uid in get(/databases/$(database)/documents/conversations/$(convId)).data.participants;
+                      && isConversationParticipant();
 
         // Participants can update messages (for marking as read)
-        allow update: if request.auth != null
-                      && request.auth.uid in get(/databases/$(database)/documents/conversations/$(convId)).data.participants;
+        allow update: if isConversationParticipant();
 
         // Messages cannot be deleted from the client
         allow delete: if false;
@@ -116,4 +128,3 @@ service cloud.firestore {
     // (No catch-all match needed — Firestore denies by default)
   }
 }
-```

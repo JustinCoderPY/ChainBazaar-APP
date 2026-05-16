@@ -2,7 +2,7 @@ import {
     addDoc,
     collection,
     doc,
-    getDoc,
+    FirestoreError,
     getDocs,
     onSnapshot,
     orderBy,
@@ -51,31 +51,37 @@ export async function getOrCreateConversation(
 ): Promise<string> {
   const conversationId = makeConversationId(currentUserId, sellerId, productId);
   const conversationRef = doc(db, 'conversations', conversationId);
+  const logContext = {
+    currentUserId,
+    sellerId,
+    productId,
+    conversationId,
+  };
 
-  const existing = await getDoc(conversationRef);
-
-  if (existing.exists()) {
-    console.log('[MessageService] Existing conversation found:', conversationId);
-    return conversationId;
-  }
-
-  // Create new conversation document with a deterministic ID
   const participants: [string, string] = [currentUserId, sellerId].sort() as [string, string];
 
-  await setDoc(conversationRef, {
-    participants,
-    participantNames: {
-      [currentUserId]: currentUserName,
-      [sellerId]: sellerName,
-    },
-    lastMessage: '',
-    lastMessageSenderId: '',
-    lastUpdated: serverTimestamp(),
-    productId,
-    productTitle,
-  });
+  try {
+    await setDoc(conversationRef, {
+      participants,
+      participantNames: {
+        [currentUserId]: currentUserName,
+        [sellerId]: sellerName,
+      },
+      productId,
+      productTitle,
+    }, { merge: true });
+  } catch (error) {
+    const firebaseError = error as FirestoreError;
+    console.error('[MessageService] getOrCreateConversation failed:', {
+      ...logContext,
+      participants,
+      code: firebaseError.code,
+      message: firebaseError.message,
+    });
+    throw error;
+  }
 
-  console.log('[MessageService] Created new conversation:', conversationId);
+  console.log('[MessageService] Conversation ready:', logContext);
   return conversationId;
 }
 

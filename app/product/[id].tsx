@@ -3,7 +3,6 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import {
   Alert,
-  Dimensions,
   Image,
   Platform,
   SafeAreaView,
@@ -11,6 +10,7 @@ import {
   Share,
   StyleSheet,
   Text,
+  useWindowDimensions,
   View,
 } from 'react-native';
 import AnimatedPressable from '../../components/AnimatedPressable';
@@ -22,9 +22,12 @@ import { deleteListing, getAllListings } from '../../services/firebaseService';
 import { getOrCreateConversation } from '../../services/messageService'; // ✅ NEW
 import { Product } from '../../types';
 
-const { width } = Dimensions.get('window');
 const LOGIN_ROUTE = '/auth/login';
 const HOME_ROUTE = '/';
+const MOBILE_IMAGE_MIN_HEIGHT = 260;
+const MOBILE_IMAGE_MAX_HEIGHT = 320;
+const WEB_IMAGE_MAX_WIDTH = 720;
+const WEB_IMAGE_MAX_HEIGHT = 420;
 
 const showAlert = (title: string, message: string) => {
   if (Platform.OS === 'web' && typeof window !== 'undefined') {
@@ -56,6 +59,7 @@ const confirmAction = (title: string, message: string, onConfirm: () => void) =>
 export default function ProductDetailsScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
+  const { width } = useWindowDimensions();
   const { user, isGuest } = useAuth();    // ✅ also grab isGuest
   const [product, setProduct] = useState<Product | null>(null);
   const [btcPrice, setBtcPrice] = useState(97000);
@@ -208,12 +212,19 @@ export default function ProductDetailsScreen() {
     product.imageUrls && product.imageUrls.length > 0
     ? product.imageUrls
     : ['https://picsum.photos/400'];
+  const isWideLayout = Platform.OS === 'web' || width >= 768;
+  const imageWidth = isWideLayout
+    ? Math.min(width - 32, WEB_IMAGE_MAX_WIDTH)
+    : width;
+  const imageHeight = isWideLayout
+    ? Math.min(imageWidth * 0.62, WEB_IMAGE_MAX_HEIGHT)
+    : Math.min(Math.max(width * 0.74, MOBILE_IMAGE_MIN_HEIGHT), MOBILE_IMAGE_MAX_HEIGHT);
 
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView showsVerticalScrollIndicator={false}>
         {/* ── Back + Share Bar ─────────────────────────────── */}
-        <View style={styles.topBar}>
+        <View style={[styles.topBar, { width: imageWidth }]}>
           <AnimatedPressable style={styles.backButton} onPress={handleBack}>
             <Ionicons name="arrow-back" size={24} color={Colors.secondary} />
           </AnimatedPressable>
@@ -223,24 +234,27 @@ export default function ProductDetailsScreen() {
         </View>
 
         {/* ── Image Carousel ──────────────────────────────── */}
-        <ScrollView
-          horizontal
-          pagingEnabled
-          showsHorizontalScrollIndicator={false}
-          onMomentumScrollEnd={(e) => {
-            const index = Math.round(e.nativeEvent.contentOffset.x / width);
-            setCurrentImageIndex(index);
-          }}
-        >
-          {images.map((url, index) => (
-            <Image
-              key={index}
-              source={{ uri: url }}
-              style={styles.image}
-              resizeMode="cover"
-            />
-          ))}
-        </ScrollView>
+        <View style={[styles.carouselFrame, { width: imageWidth, height: imageHeight }]}>
+          <ScrollView
+            horizontal
+            pagingEnabled
+            showsHorizontalScrollIndicator={false}
+            style={styles.carouselScroller}
+            onMomentumScrollEnd={(e) => {
+              const index = Math.round(e.nativeEvent.contentOffset.x / imageWidth);
+              setCurrentImageIndex(index);
+            }}
+          >
+            {images.map((url, index) => (
+              <Image
+                key={index}
+                source={{ uri: url }}
+                style={[styles.image, { width: imageWidth, height: imageHeight }]}
+                resizeMode="contain"
+              />
+            ))}
+          </ScrollView>
+        </View>
 
         {/* Page Dots */}
         {images.length > 1 && (
@@ -340,8 +354,7 @@ const styles = StyleSheet.create({
     paddingBottom: 8,
     position: 'absolute',
     top: 0,
-    left: 0,
-    right: 0,
+    alignSelf: 'center',
     zIndex: 10,
   },
   backButton: {
@@ -360,9 +373,17 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
+  carouselFrame: {
+    alignSelf: 'center',
+    maxWidth: WEB_IMAGE_MAX_WIDTH,
+    maxHeight: WEB_IMAGE_MAX_HEIGHT,
+    backgroundColor: '#1A1A1A',
+    overflow: 'hidden',
+  },
+  carouselScroller: {
+    flex: 1,
+  },
   image: {
-    width: width,
-    height: width * 0.85,
     backgroundColor: '#1A1A1A',
   },
   dotsContainer: {
