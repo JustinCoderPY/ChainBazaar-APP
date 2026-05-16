@@ -25,9 +25,9 @@ import { Product } from '../../types';
 const LOGIN_ROUTE = '/auth/login';
 const HOME_ROUTE = '/';
 const MOBILE_IMAGE_MIN_HEIGHT = 260;
-const MOBILE_IMAGE_MAX_HEIGHT = 320;
-const WEB_IMAGE_MAX_WIDTH = 720;
-const WEB_IMAGE_MAX_HEIGHT = 420;
+const MOBILE_IMAGE_MAX_HEIGHT = 300;
+const WEB_IMAGE_MAX_WIDTH = 560;
+const WEB_IMAGE_MAX_HEIGHT = 360;
 
 const showAlert = (title: string, message: string) => {
   if (Platform.OS === 'web' && typeof window !== 'undefined') {
@@ -214,10 +214,10 @@ export default function ProductDetailsScreen() {
     : ['https://picsum.photos/400'];
   const isWideLayout = Platform.OS === 'web' || width >= 768;
   const imageWidth = isWideLayout
-    ? Math.min(width - 32, WEB_IMAGE_MAX_WIDTH)
-    : width;
+    ? Math.min(width - 40, WEB_IMAGE_MAX_WIDTH)
+    : Math.max(width - 24, 0);
   const imageHeight = isWideLayout
-    ? Math.min(imageWidth * 0.62, WEB_IMAGE_MAX_HEIGHT)
+    ? Math.min(Math.max(imageWidth * 0.58, 320), WEB_IMAGE_MAX_HEIGHT)
     : Math.min(Math.max(width * 0.74, MOBILE_IMAGE_MIN_HEIGHT), MOBILE_IMAGE_MAX_HEIGHT);
 
   return (
@@ -271,7 +271,7 @@ export default function ProductDetailsScreen() {
           </View>
         )}
 
-        <View style={styles.content}>
+        <View style={[styles.content, { width: imageWidth }]}>
           <View style={styles.categoryBadge}>
             <Text style={styles.categoryText}>{product.category}</Text>
           </View>
@@ -375,9 +375,11 @@ const styles = StyleSheet.create({
   },
   carouselFrame: {
     alignSelf: 'center',
+    marginTop: 8,
     maxWidth: WEB_IMAGE_MAX_WIDTH,
     maxHeight: WEB_IMAGE_MAX_HEIGHT,
     backgroundColor: '#1A1A1A',
+    borderRadius: Radii.md,
     overflow: 'hidden',
   },
   carouselScroller: {
@@ -389,7 +391,8 @@ const styles = StyleSheet.create({
   dotsContainer: {
     flexDirection: 'row',
     justifyContent: 'center',
-    paddingVertical: 10,
+    paddingTop: 8,
+    paddingBottom: 4,
   },
   dot: {
     width: 8,
@@ -402,7 +405,11 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.accent,
   },
   content: {
-    padding: 20,
+    alignSelf: 'center',
+    maxWidth: WEB_IMAGE_MAX_WIDTH,
+    paddingHorizontal: 4,
+    paddingTop: 10,
+    paddingBottom: 20,
   },
   categoryBadge: {
     alignSelf: 'flex-start',
