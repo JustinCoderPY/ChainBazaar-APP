@@ -4,7 +4,9 @@ import { useEffect, useState } from 'react';
 import {
   Alert,
   Image,
+  Modal,
   Platform,
+  Pressable,
   SafeAreaView,
   ScrollView,
   Share,
@@ -24,11 +26,11 @@ import { Product } from '../../types';
 
 const LOGIN_ROUTE = '/auth/login';
 const HOME_ROUTE = '/';
-const MOBILE_IMAGE_MIN_HEIGHT = 260;
-const MOBILE_IMAGE_MAX_HEIGHT = 300;
-const PRODUCT_DETAIL_MAX_WIDTH = 720;
-const WEB_IMAGE_MAX_WIDTH = 720;
-const WEB_IMAGE_MAX_HEIGHT = 400;
+const MOBILE_IMAGE_MIN_HEIGHT = 240;
+const MOBILE_IMAGE_MAX_HEIGHT = 280;
+const PRODUCT_DETAIL_MAX_WIDTH = 700;
+const WEB_IMAGE_MAX_WIDTH = 700;
+const WEB_IMAGE_MAX_HEIGHT = 380;
 const DESKTOP_BREAKPOINT = 900;
 
 const showAlert = (title: string, message: string) => {
@@ -61,12 +63,13 @@ const confirmAction = (title: string, message: string, onConfirm: () => void) =>
 export default function ProductDetailsScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { width } = useWindowDimensions();
+  const { width, height } = useWindowDimensions();
   const { user, isGuest } = useAuth();    // ✅ also grab isGuest
   const [product, setProduct] = useState<Product | null>(null);
   const [btcPrice, setBtcPrice] = useState(97000);
   const [ethPrice, setEthPrice] = useState(2700);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  const [imageViewerVisible, setImageViewerVisible] = useState(false);
   const [messagingLoading, setMessagingLoading] = useState(false); // ✅ NEW
 
   const isOwner =
@@ -220,8 +223,9 @@ export default function ProductDetailsScreen() {
     : Math.max(width - 24, 0);
   const imageWidth = Math.min(detailWidth, WEB_IMAGE_MAX_WIDTH);
   const imageHeight = isDesktopLayout
-    ? Math.min(Math.max(imageWidth * 0.54, 360), WEB_IMAGE_MAX_HEIGHT)
-    : Math.min(Math.max(width * 0.74, MOBILE_IMAGE_MIN_HEIGHT), MOBILE_IMAGE_MAX_HEIGHT);
+    ? Math.min(Math.max(imageWidth * 0.52, 340), WEB_IMAGE_MAX_HEIGHT)
+    : Math.min(Math.max(width * 0.68, MOBILE_IMAGE_MIN_HEIGHT), MOBILE_IMAGE_MAX_HEIGHT);
+  const selectedImage = images[currentImageIndex] ?? images[0];
 
   return (
     <SafeAreaView style={styles.container}>
@@ -249,12 +253,19 @@ export default function ProductDetailsScreen() {
               }}
             >
               {images.map((url, index) => (
-                <Image
+                <Pressable
                   key={index}
-                  source={{ uri: url }}
-                  style={[styles.image, { width: imageWidth, height: imageHeight }]}
-                  resizeMode="cover"
-                />
+                  onPress={() => {
+                    setCurrentImageIndex(index);
+                    setImageViewerVisible(true);
+                  }}
+                >
+                  <Image
+                    source={{ uri: url }}
+                    style={[styles.image, { width: imageWidth, height: imageHeight }]}
+                    resizeMode="cover"
+                  />
+                </Pressable>
               ))}
             </ScrollView>
           </View>
@@ -331,6 +342,33 @@ export default function ProductDetailsScreen() {
           </View>
         </View>
       </ScrollView>
+
+      <Modal
+        visible={imageViewerVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setImageViewerVisible(false)}
+      >
+        <View style={styles.imageModal}>
+          <AnimatedPressable
+            style={styles.imageModalClose}
+            onPress={() => setImageViewerVisible(false)}
+          >
+            <Ionicons name="close" size={28} color={Colors.secondary} />
+          </AnimatedPressable>
+          <Image
+            source={{ uri: selectedImage }}
+            style={[
+              styles.fullImage,
+              {
+                width: Math.max(width - 32, 0),
+                height: Math.max(height - 120, 0),
+              },
+            ]}
+            resizeMode="contain"
+          />
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -395,6 +433,27 @@ const styles = StyleSheet.create({
   },
   image: {
     backgroundColor: '#1A1A1A',
+  },
+  imageModal: {
+    flex: 1,
+    backgroundColor: '#000',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  imageModalClose: {
+    position: 'absolute',
+    top: 48,
+    right: 20,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(255,255,255,0.12)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 20,
+  },
+  fullImage: {
+    backgroundColor: '#000',
   },
   dotsContainer: {
     flexDirection: 'row',
