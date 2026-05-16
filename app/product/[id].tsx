@@ -26,8 +26,10 @@ const LOGIN_ROUTE = '/auth/login';
 const HOME_ROUTE = '/';
 const MOBILE_IMAGE_MIN_HEIGHT = 260;
 const MOBILE_IMAGE_MAX_HEIGHT = 300;
-const WEB_IMAGE_MAX_WIDTH = 560;
-const WEB_IMAGE_MAX_HEIGHT = 360;
+const WEB_DETAIL_MAX_WIDTH = 1040;
+const WEB_IMAGE_MAX_WIDTH = 600;
+const WEB_IMAGE_MAX_HEIGHT = 400;
+const WEB_DETAIL_GAP = 28;
 
 const showAlert = (title: string, message: string) => {
   if (Platform.OS === 'web' && typeof window !== 'undefined') {
@@ -213,118 +215,143 @@ export default function ProductDetailsScreen() {
     ? product.imageUrls
     : ['https://picsum.photos/400'];
   const isWideLayout = Platform.OS === 'web' || width >= 768;
+  const detailWidth = isWideLayout
+    ? Math.min(width - 48, WEB_DETAIL_MAX_WIDTH)
+    : width;
   const imageWidth = isWideLayout
-    ? Math.min(width - 40, WEB_IMAGE_MAX_WIDTH)
+    ? Math.min(detailWidth * 0.56, WEB_IMAGE_MAX_WIDTH)
     : Math.max(width - 24, 0);
   const imageHeight = isWideLayout
-    ? Math.min(Math.max(imageWidth * 0.58, 320), WEB_IMAGE_MAX_HEIGHT)
+    ? Math.min(Math.max(imageWidth * 0.64, 340), WEB_IMAGE_MAX_HEIGHT)
     : Math.min(Math.max(width * 0.74, MOBILE_IMAGE_MIN_HEIGHT), MOBILE_IMAGE_MAX_HEIGHT);
+  const contentWidth = isWideLayout
+    ? Math.max(detailWidth - imageWidth - WEB_DETAIL_GAP, 320)
+    : imageWidth;
 
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView showsVerticalScrollIndicator={false}>
-        {/* ── Back + Share Bar ─────────────────────────────── */}
-        <View style={[styles.topBar, { width: imageWidth }]}>
-          <AnimatedPressable style={styles.backButton} onPress={handleBack}>
-            <Ionicons name="arrow-back" size={24} color={Colors.secondary} />
-          </AnimatedPressable>
-          <AnimatedPressable style={styles.shareButton} onPress={handleShare}>
-            <Ionicons name="share-outline" size={22} color={Colors.secondary} />
-          </AnimatedPressable>
-        </View>
+        <View
+          style={[
+            styles.detailShell,
+            {
+              width: detailWidth,
+              flexDirection: isWideLayout ? 'row' : 'column',
+              gap: isWideLayout ? WEB_DETAIL_GAP : 0,
+            },
+          ]}
+        >
+          <View style={[styles.mediaColumn, { width: imageWidth }]}>
+            {/* ── Back + Share Bar ─────────────────────────────── */}
+            <View style={[styles.topBar, { width: imageWidth }]}>
+              <AnimatedPressable style={styles.backButton} onPress={handleBack}>
+                <Ionicons name="arrow-back" size={24} color={Colors.secondary} />
+              </AnimatedPressable>
+              <AnimatedPressable style={styles.shareButton} onPress={handleShare}>
+                <Ionicons name="share-outline" size={22} color={Colors.secondary} />
+              </AnimatedPressable>
+            </View>
 
-        {/* ── Image Carousel ──────────────────────────────── */}
-        <View style={[styles.carouselFrame, { width: imageWidth, height: imageHeight }]}>
-          <ScrollView
-            horizontal
-            pagingEnabled
-            showsHorizontalScrollIndicator={false}
-            style={styles.carouselScroller}
-            onMomentumScrollEnd={(e) => {
-              const index = Math.round(e.nativeEvent.contentOffset.x / imageWidth);
-              setCurrentImageIndex(index);
-            }}
+            {/* ── Image Carousel ──────────────────────────────── */}
+            <View style={[styles.carouselFrame, { width: imageWidth, height: imageHeight }]}>
+              <ScrollView
+                horizontal
+                pagingEnabled
+                showsHorizontalScrollIndicator={false}
+                style={styles.carouselScroller}
+                onMomentumScrollEnd={(e) => {
+                  const index = Math.round(e.nativeEvent.contentOffset.x / imageWidth);
+                  setCurrentImageIndex(index);
+                }}
+              >
+                {images.map((url, index) => (
+                  <Image
+                    key={index}
+                    source={{ uri: url }}
+                    style={[styles.image, { width: imageWidth, height: imageHeight }]}
+                    resizeMode="contain"
+                  />
+                ))}
+              </ScrollView>
+            </View>
+
+            {/* Page Dots */}
+            {images.length > 1 && (
+              <View style={styles.dotsContainer}>
+                {images.map((_, index) => (
+                  <View
+                    key={index}
+                    style={[
+                      styles.dot,
+                      index === currentImageIndex && styles.activeDot,
+                    ]}
+                  />
+                ))}
+              </View>
+            )}
+          </View>
+
+          <View
+            style={[
+              styles.content,
+              isWideLayout && styles.contentCard,
+              { width: contentWidth },
+            ]}
           >
-            {images.map((url, index) => (
-              <Image
-                key={index}
-                source={{ uri: url }}
-                style={[styles.image, { width: imageWidth, height: imageHeight }]}
-                resizeMode="contain"
-              />
-            ))}
-          </ScrollView>
-        </View>
-
-        {/* Page Dots */}
-        {images.length > 1 && (
-          <View style={styles.dotsContainer}>
-            {images.map((_, index) => (
-              <View
-                key={index}
-                style={[
-                  styles.dot,
-                  index === currentImageIndex && styles.activeDot,
-                ]}
-              />
-            ))}
-          </View>
-        )}
-
-        <View style={[styles.content, { width: imageWidth }]}>
-          <View style={styles.categoryBadge}>
-            <Text style={styles.categoryText}>{product.category}</Text>
-          </View>
-
-          <Text style={styles.title}>{product.title}</Text>
-
-          <View style={styles.priceSection}>
-            <Text style={styles.usdPrice}>${product.price.toFixed(2)}</Text>
-            <View style={styles.cryptoPrices}>
-              <Text style={styles.cryptoPrice}>
-                <Ionicons name="logo-bitcoin" size={13} color={Colors.accent} /> {btcAmount} BTC
-              </Text>
-              <Text style={styles.cryptoPrice}>
-                <Ionicons name="diamond-outline" size={13} color="#627EEA" /> {ethAmount} ETH
-              </Text>
+            <View style={styles.categoryBadge}>
+              <Text style={styles.categoryText}>{product.category}</Text>
             </View>
-          </View>
 
-          {/* Seller Info */}
-          <View style={styles.sellerSection}>
-            <View style={styles.sellerAvatar}>
-              <Text style={styles.sellerAvatarText}>
-                {product.sellerName.charAt(0).toUpperCase()}
-              </Text>
+            <Text style={styles.title}>{product.title}</Text>
+
+            <View style={styles.priceSection}>
+              <Text style={styles.usdPrice}>${product.price.toFixed(2)}</Text>
+              <View style={styles.cryptoPrices}>
+                <Text style={styles.cryptoPrice}>
+                  <Ionicons name="logo-bitcoin" size={13} color={Colors.accent} /> {btcAmount} BTC
+                </Text>
+                <Text style={styles.cryptoPrice}>
+                  <Ionicons name="diamond-outline" size={13} color="#627EEA" /> {ethAmount} ETH
+                </Text>
+              </View>
             </View>
-            <View style={styles.sellerInfo}>
-              <Text style={styles.sellerLabel}>Seller</Text>
-              <Text style={styles.sellerName}>{product.sellerName}</Text>
+
+            {/* Seller Info */}
+            <View style={styles.sellerSection}>
+              <View style={styles.sellerAvatar}>
+                <Text style={styles.sellerAvatarText}>
+                  {product.sellerName.charAt(0).toUpperCase()}
+                </Text>
+              </View>
+              <View style={styles.sellerInfo}>
+                <Text style={styles.sellerLabel}>Seller</Text>
+                <Text style={styles.sellerName}>{product.sellerName}</Text>
+              </View>
             </View>
+
+            {/* Description */}
+            <Text style={styles.descriptionLabel}>Description</Text>
+            <Text style={styles.description}>{product.description}</Text>
+
+            {/* ── Action Buttons ─────────────────────────────── */}
+            {isOwner ? (
+              <AnimatedPressable style={styles.deleteButton} onPress={handleDelete}>
+                <Ionicons name="trash-outline" size={20} color="#FF4444" />
+                <Text style={styles.deleteButtonText}>Delete Listing</Text>
+              </AnimatedPressable>
+            ) : (
+              <AnimatedPressable
+                style={styles.messageButton}
+                onPress={handleMessageSeller}
+                disabled={messagingLoading}
+              >
+                <Ionicons name="chatbubble-outline" size={20} color={Colors.secondary} />
+                <Text style={styles.messageButtonText}>
+                  {messagingLoading ? 'Opening Chat...' : 'Message Seller'}
+                </Text>
+              </AnimatedPressable>
+            )}
           </View>
-
-          {/* Description */}
-          <Text style={styles.descriptionLabel}>Description</Text>
-          <Text style={styles.description}>{product.description}</Text>
-
-          {/* ── Action Buttons ─────────────────────────────── */}
-          {isOwner ? (
-            <AnimatedPressable style={styles.deleteButton} onPress={handleDelete}>
-              <Ionicons name="trash-outline" size={20} color="#FF4444" />
-              <Text style={styles.deleteButtonText}>Delete Listing</Text>
-            </AnimatedPressable>
-          ) : (
-            <AnimatedPressable
-              style={styles.messageButton}
-              onPress={handleMessageSeller}
-              disabled={messagingLoading}
-            >
-              <Ionicons name="chatbubble-outline" size={20} color={Colors.secondary} />
-              <Text style={styles.messageButtonText}>
-                {messagingLoading ? 'Opening Chat...' : 'Message Seller'}
-              </Text>
-            </AnimatedPressable>
-          )}
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -357,6 +384,15 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
     zIndex: 10,
   },
+  detailShell: {
+    alignSelf: 'center',
+    paddingHorizontal: 12,
+    paddingTop: 18,
+    paddingBottom: 28,
+  },
+  mediaColumn: {
+    alignSelf: 'center',
+  },
   backButton: {
     width: 40,
     height: 40,
@@ -375,7 +411,6 @@ const styles = StyleSheet.create({
   },
   carouselFrame: {
     alignSelf: 'center',
-    marginTop: 8,
     maxWidth: WEB_IMAGE_MAX_WIDTH,
     maxHeight: WEB_IMAGE_MAX_HEIGHT,
     backgroundColor: '#1A1A1A',
@@ -406,10 +441,17 @@ const styles = StyleSheet.create({
   },
   content: {
     alignSelf: 'center',
-    maxWidth: WEB_IMAGE_MAX_WIDTH,
-    paddingHorizontal: 4,
-    paddingTop: 10,
+    paddingHorizontal: 0,
+    paddingTop: 12,
     paddingBottom: 20,
+  },
+  contentCard: {
+    alignSelf: 'flex-start',
+    backgroundColor: '#121212',
+    borderRadius: Radii.md,
+    borderWidth: 1,
+    borderColor: '#222',
+    padding: 22,
   },
   categoryBadge: {
     alignSelf: 'flex-start',
