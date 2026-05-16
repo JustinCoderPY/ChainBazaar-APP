@@ -22,6 +22,8 @@ export default function RootLayout() {
               headerShadowVisible: false,
             }}
           />
+          <Stack.Screen name="account-settings" options={{ headerShown: false }} />
+          <Stack.Screen name="connect-wallet" options={{ headerShown: false }} />
           <Stack.Screen
             name="chat/[id]"
             options={{

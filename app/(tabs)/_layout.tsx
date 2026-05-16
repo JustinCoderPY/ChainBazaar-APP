@@ -1,5 +1,5 @@
 import { Tabs } from 'expo-router';
-import { Platform, StyleSheet, View } from 'react-native';
+import { Platform, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '@/constants/Colors';
 
@@ -8,16 +8,18 @@ import { Colors } from '@/constants/Colors';
 // Tab name      Active icon              Inactive icon
 // ──────────    ────────────────         ────────────────
 // Explore       compass                  compass-outline
-// Messages      chatbubbles              chatbubbles-outline
+// Saved         heart                    heart-outline
 // Sell          add-circle               add-circle-outline
+// Messages      chatbubbles              chatbubbles-outline
 // Profile       person-circle            person-circle-outline
 
 type IoniconsName = keyof typeof Ionicons.glyphMap;
 
 const TAB_ICONS: Record<string, { active: IoniconsName; inactive: IoniconsName }> = {
   index:    { active: 'compass',         inactive: 'compass-outline' },
-  messages: { active: 'chatbubbles',     inactive: 'chatbubbles-outline' },
+  saved:    { active: 'heart',           inactive: 'heart-outline' },
   create:   { active: 'add-circle',      inactive: 'add-circle-outline' },
+  messages: { active: 'chatbubbles',     inactive: 'chatbubbles-outline' },
   profile:  { active: 'person-circle',   inactive: 'person-circle-outline' },
 };
 
@@ -46,15 +48,21 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
-        name="messages"
+        name="saved"
         options={{
-          title: 'Messages',
+          title: 'Saved',
         }}
       />
       <Tabs.Screen
         name="create"
         options={{
           title: 'Sell',
+        }}
+      />
+      <Tabs.Screen
+        name="messages"
+        options={{
+          title: 'Messages',
         }}
       />
       <Tabs.Screen

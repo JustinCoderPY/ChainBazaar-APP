@@ -1,4 +1,5 @@
 import { useFocusEffect, useRouter } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
 import React, { useCallback, useState } from 'react';
 import {
   Alert,
@@ -24,6 +25,7 @@ import { getUserListings } from '../../services/firebaseService';
 const { width } = Dimensions.get('window');
 const CARD_WIDTH = (width - 48) / 2;
 const LOGOUT_REDIRECT_ROUTE = '/auth/login';
+type IoniconsName = keyof typeof Ionicons.glyphMap;
 
 const confirmAction = (title: string, message: string, onConfirm: () => void) => {
   if (Platform.OS === 'web' && typeof window !== 'undefined') {
@@ -97,6 +99,18 @@ export default function ProfileScreen() {
     });
   };
 
+  const handleNotifications = () => {
+    showAlert('Notifications', 'Push notification preferences will be available soon.');
+  };
+
+  const handlePrivacy = () => {
+    showAlert('Privacy', 'Privacy settings will be available in a future update.');
+  };
+
+  const handleHelpCenter = () => {
+    showAlert('Help Center', 'Need help? Contact us at support@chainbazaar.com');
+  };
+
   if (isGuest || !user) {
     return (
       <SafeAreaView style={styles.container}>
@@ -145,46 +159,132 @@ export default function ProfileScreen() {
   };
 
   const initials = (user?.name?.trim()?.charAt(0) || 'U').toUpperCase();
+  const renderSettingsRow = ({
+    icon,
+    iconColor,
+    title,
+    subtitle,
+    onPress,
+    destructive = false,
+  }: {
+    icon: IoniconsName;
+    iconColor: string;
+    title: string;
+    subtitle?: string;
+    onPress: () => void;
+    destructive?: boolean;
+  }) => (
+    <AnimatedPressable
+      style={[styles.settingsRow, destructive && loggingOut && styles.rowDisabled]}
+      onPress={onPress}
+      disabled={destructive && loggingOut}
+      scaleValue={0.98}
+    >
+      <View style={[styles.settingsIcon, { backgroundColor: `${iconColor}18` }]}>
+        <Ionicons name={icon} size={22} color={iconColor} />
+      </View>
+      <View style={styles.settingsText}>
+        <Text style={[styles.settingsLabel, destructive && styles.destructiveText]}>
+          {destructive && loggingOut ? 'Logging out...' : title}
+        </Text>
+        {subtitle && <Text style={styles.settingsSubtitle}>{subtitle}</Text>}
+      </View>
+      {!destructive && <Ionicons name="chevron-forward" size={20} color="#707070" />}
+    </AnimatedPressable>
+  );
+
+  const renderSettingsSection = (
+    title: string,
+    rows: React.ReactNode[],
+  ) => (
+    <View style={styles.settingsSection}>
+      {title && <Text style={styles.sectionTitle}>{title}</Text>}
+      <View style={styles.settingsCard}>
+        {rows.map((row, index) => (
+          <React.Fragment key={index}>{row}</React.Fragment>
+        ))}
+      </View>
+    </View>
+  );
+
+  const renderProfileHeader = () => (
+    <View style={styles.profileHeader}>
+      <Text style={styles.screenTitle}>Settings</Text>
+      <View style={styles.avatarLarge}>
+        <Text style={styles.avatarLargeText}>{initials}</Text>
+        <View style={styles.avatarAddBadge}>
+          <Ionicons name="add" size={24} color="#0D0D0D" />
+        </View>
+      </View>
+      <Text style={styles.profileName}>{user?.name}</Text>
+      <Text style={styles.profileEmail}>{user?.email}</Text>
+
+      {renderSettingsSection('Account', [
+        renderSettingsRow({
+          icon: 'lock-closed-outline',
+          iconColor: '#FFB267',
+          title: 'Change Password',
+          subtitle: 'Update your login credentials',
+          onPress: () => router.push('/account-settings' as any),
+        }),
+      ])}
+
+      {renderSettingsSection('Crypto', [
+        renderSettingsRow({
+          icon: 'wallet-outline',
+          iconColor: '#F7931A',
+          title: 'Connect Crypto Wallet',
+          subtitle: 'MetaMask, WalletConnect',
+          onPress: () => router.push('/connect-wallet' as any),
+        }),
+      ])}
+
+      {renderSettingsSection('App Settings', [
+        renderSettingsRow({
+          icon: 'notifications-outline',
+          iconColor: '#75F29B',
+          title: 'Notifications',
+          subtitle: 'Push notification preferences',
+          onPress: handleNotifications,
+        }),
+        renderSettingsRow({
+          icon: 'shield-checkmark-outline',
+          iconColor: '#A8C7FF',
+          title: 'Privacy',
+          subtitle: 'Data and visibility settings',
+          onPress: handlePrivacy,
+        }),
+        renderSettingsRow({
+          icon: 'help-circle-outline',
+          iconColor: '#A5ADBA',
+          title: 'Help Center',
+          subtitle: 'FAQ and support',
+          onPress: handleHelpCenter,
+        }),
+      ])}
+
+      {renderSettingsSection('', [
+        renderSettingsRow({
+          icon: 'log-out-outline',
+          iconColor: Colors.danger,
+          title: 'Logout',
+          onPress: handleLogout,
+          destructive: true,
+        }),
+      ])}
+
+      <Text style={styles.myListingsTitle}>My Listings</Text>
+    </View>
+  );
 
   return (
     <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
-        <View style={styles.avatar}>
-          <Text style={styles.avatarText}>{initials}</Text>
-        </View>
-        <Text style={styles.name}>{user?.name}</Text>
-        <Text style={styles.email}>{user?.email}</Text>
-
-        <View style={styles.statsContainer}>
-          <View style={styles.statBox}>
-            <Text style={styles.statNumber}>{myListings.length}</Text>
-            <Text style={styles.statLabel}>LISTINGS</Text>
-          </View>
-          <View style={styles.statBox}>
-            <Text style={styles.statNumber}>0</Text>
-            <Text style={styles.statLabel}>SOLD</Text>
-          </View>
-          <View style={styles.statBox}>
-            <Text style={styles.statNumber}>0</Text>
-            <Text style={styles.statLabel}>FAVS</Text>
-          </View>
-        </View>
-
-        <AnimatedPressable
-          style={[styles.logoutButton, loggingOut && styles.logoutButtonDisabled]}
-          onPress={handleLogout}
-          disabled={loggingOut}
-          scaleValue={0.95}
-        >
-          <Text style={styles.logoutButtonText}>{loggingOut ? 'Logging out...' : 'Logout'}</Text>
-        </AnimatedPressable>
-      </View>
-
       <FlatList
         data={myListings}
         keyExtractor={(item) => String(item.id)}
         numColumns={2}
         renderItem={renderGridItem}
+        ListHeaderComponent={renderProfileHeader}
         contentContainerStyle={styles.gridList}
         columnWrapperStyle={styles.gridRow}
         refreshControl={
@@ -249,6 +349,120 @@ const styles = StyleSheet.create({
     color: Colors.secondary,
     fontSize: 16,
     fontWeight: 'bold',
+  },
+
+  profileHeader: {
+    paddingTop: 20,
+    paddingBottom: 18,
+  },
+  screenTitle: {
+    fontSize: 28,
+    fontWeight: '800',
+    color: Colors.secondary,
+    textAlign: 'center',
+    marginBottom: 34,
+  },
+  avatarLarge: {
+    alignSelf: 'center',
+    width: 118,
+    height: 118,
+    borderRadius: 59,
+    backgroundColor: Colors.accent,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 18,
+  },
+  avatarLargeText: {
+    fontSize: 34,
+    fontWeight: '700',
+    color: '#0D0D0D',
+  },
+  avatarAddBadge: {
+    position: 'absolute',
+    right: -4,
+    bottom: 10,
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: '#9CCBFF',
+    borderWidth: 4,
+    borderColor: Colors.primary,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  profileName: {
+    fontSize: 22,
+    fontWeight: '800',
+    color: Colors.secondary,
+    textAlign: 'center',
+    marginBottom: 4,
+  },
+  profileEmail: {
+    fontSize: 16,
+    color: '#C7CCD6',
+    textAlign: 'center',
+    marginBottom: 34,
+  },
+  settingsSection: {
+    marginBottom: 24,
+  },
+  sectionTitle: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: '#B8BEC9',
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
+    marginBottom: 10,
+    marginLeft: 2,
+  },
+  settingsCard: {
+    backgroundColor: '#161616',
+    borderRadius: Radii.lg,
+    borderWidth: 1,
+    borderColor: '#2A2A2A',
+    overflow: 'hidden',
+  },
+  settingsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    minHeight: 88,
+    paddingHorizontal: 22,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#222222',
+  },
+  rowDisabled: {
+    opacity: 0.6,
+  },
+  settingsIcon: {
+    width: 52,
+    height: 52,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 18,
+  },
+  settingsText: {
+    flex: 1,
+  },
+  settingsLabel: {
+    fontSize: 20,
+    fontWeight: '800',
+    color: Colors.secondary,
+    marginBottom: 4,
+  },
+  destructiveText: {
+    color: '#FFB4AB',
+  },
+  settingsSubtitle: {
+    fontSize: 16,
+    color: '#C7CCD6',
+  },
+  myListingsTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: Colors.secondary,
+    marginBottom: 14,
   },
 
   // Header

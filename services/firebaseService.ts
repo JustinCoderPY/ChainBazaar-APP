@@ -1,4 +1,16 @@
-import { addDoc, collection, deleteDoc, doc, getDocs, orderBy, query, where } from 'firebase/firestore';
+import {
+  addDoc,
+  collection,
+  deleteDoc,
+  doc,
+  getDoc,
+  getDocs,
+  orderBy,
+  query,
+  serverTimestamp,
+  setDoc,
+  where,
+} from 'firebase/firestore';
 import { getDownloadURL, ref, uploadBytes } from 'firebase/storage';
 import { Platform } from 'react-native';
 import { auth, db, storage } from '../config/firebase';
@@ -264,6 +276,78 @@ export const deleteListing = async (productId: string): Promise<void> => {
     await deleteDoc(doc(db, 'products', productId));
   } catch (error) {
     console.error('Error deleting listing:', error);
+    throw error;
+  }
+};
+
+export const saveListingForUser = async (userId: string, productId: string): Promise<void> => {
+  try {
+    await setDoc(doc(db, 'users', userId, 'savedListings', productId), {
+      productId,
+      savedAt: serverTimestamp(),
+    });
+  } catch (error) {
+    console.error('Error saving listing:', error);
+    throw error;
+  }
+};
+
+export const unsaveListingForUser = async (userId: string, productId: string): Promise<void> => {
+  try {
+    await deleteDoc(doc(db, 'users', userId, 'savedListings', productId));
+  } catch (error) {
+    console.error('Error unsaving listing:', error);
+    throw error;
+  }
+};
+
+export const getSavedListings = async (userId: string): Promise<Product[]> => {
+  try {
+    const savedSnapshot = await getDocs(collection(db, 'users', userId, 'savedListings'));
+    const products = await Promise.all(
+      savedSnapshot.docs.map(async (savedDoc) => {
+        const productId = (savedDoc.data().productId as string | undefined) || savedDoc.id;
+        const productSnapshot = await getDoc(doc(db, 'products', productId));
+
+        if (!productSnapshot.exists()) {
+          return null;
+        }
+
+        return normalizeProduct(productSnapshot);
+      })
+    );
+
+    return products.filter((product): product is Product => product !== null);
+  } catch (error) {
+    console.error('Error getting saved listings:', error);
+    return [];
+  }
+};
+
+export const getSavedListingIds = async (userId: string): Promise<string[]> => {
+  try {
+    const savedSnapshot = await getDocs(collection(db, 'users', userId, 'savedListings'));
+    return savedSnapshot.docs.map((savedDoc) => {
+      const data = savedDoc.data();
+      return (data.productId as string | undefined) || savedDoc.id;
+    });
+  } catch (error) {
+    console.error('Error getting saved listing ids:', error);
+    return [];
+  }
+};
+
+export const updateUserWalletPreference = async (
+  userId: string,
+  walletPreference: string,
+): Promise<void> => {
+  try {
+    await setDoc(doc(db, 'users', userId), {
+      walletPreference,
+      updatedAt: serverTimestamp(),
+    }, { merge: true });
+  } catch (error) {
+    console.error('Error saving wallet preference:', error);
     throw error;
   }
 };

@@ -77,19 +77,11 @@ export default function SettingsScreen() {
   };
 
   const handleChangePassword = () => {
-    Alert.alert(
-      'Change Password',
-      'Password management will be available once backend authentication is integrated.',
-      [{ text: 'OK' }]
-    );
+    router.push('/account-settings' as any);
   };
 
   const handleConnectWallet = () => {
-    Alert.alert(
-      'Connect Crypto Wallet',
-      'Wallet integration (MetaMask, WalletConnect) is planned for a future release.',
-      [{ text: 'OK' }]
-    );
+    router.push('/connect-wallet' as any);
   };
 
   const handleNotifications = () => {

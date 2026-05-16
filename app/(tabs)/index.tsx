@@ -15,7 +15,12 @@ import ProductCard from '../../components/ProductCard';
 import { Colors } from '../../constants/Colors';
 import { useAuth } from '../../context/AuthContext';
 import { getCryptoPrices } from '../../services/cryptoPriceService'; // ✅ Peter's price service
-import { getAllListings } from '../../services/firebaseService'; // ✅ Firebase
+import {
+  getAllListings,
+  getSavedListingIds,
+  saveListingForUser,
+  unsaveListingForUser,
+} from '../../services/firebaseService'; // ✅ Firebase
 import { Product } from '../../types';
 
 export default function HomeScreen() {
@@ -27,6 +32,7 @@ export default function HomeScreen() {
   const [ethChange24h, setEthChange24h] = useState(0);   // ✅ NEW: 24h % change for ETH
   const [refreshing, setRefreshing] = useState(false);
   const [pricesLoading, setPricesLoading] = useState(false);
+  const [savedIds, setSavedIds] = useState<string[]>([]);
 
   const { isGuest, user } = useAuth();
   const router = useRouter();
@@ -42,6 +48,13 @@ export default function HomeScreen() {
       // ✅ Load products from Firebase
       const firebaseProducts = await getAllListings();
       setProducts(firebaseProducts);
+
+      if (user?.id && !isGuest) {
+        const ids = await getSavedListingIds(user.id);
+        setSavedIds(ids);
+      } else {
+        setSavedIds([]);
+      }
 
       // ✅ Load crypto prices (supports both return shapes)
       const prices: any = await getCryptoPrices();
@@ -65,7 +78,7 @@ export default function HomeScreen() {
     } finally {
       isFetching.current = false;
     }
-  }, []);
+  }, [isGuest, user?.id]);
 
   // Load when screen comes into focus
   useFocusEffect(
@@ -95,6 +108,35 @@ export default function HomeScreen() {
       router.push('/(tabs)/create');
     }
   };
+
+  const handleToggleSaved = useCallback(async (productId: string) => {
+    if (isGuest || !user?.id) {
+      Alert.alert('Login Required', 'Please login to save listings', [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Login', onPress: () => router.push('/auth/login') },
+      ]);
+      return;
+    }
+
+    const isCurrentlySaved = savedIds.includes(productId);
+    setSavedIds((current) =>
+      isCurrentlySaved
+        ? current.filter((id) => id !== productId)
+        : [...current, productId]
+    );
+
+    try {
+      if (isCurrentlySaved) {
+        await unsaveListingForUser(user.id, productId);
+      } else {
+        await saveListingForUser(user.id, productId);
+      }
+    } catch (error) {
+      console.error('Error toggling saved listing:', error);
+      const ids = await getSavedListingIds(user.id);
+      setSavedIds(ids);
+    }
+  }, [isGuest, router, savedIds, user?.id]);
 
   const filteredProducts = products.filter((product) => {
     const title = (product.title ?? '').toLowerCase();
@@ -138,6 +180,8 @@ export default function HomeScreen() {
               btcPrice={btcPrice}
               ethPrice={ethPrice}
               onPress={() => router.push(`/product/${item.id}`)}
+              isSaved={savedIds.includes(item.id)}
+              onToggleSaved={() => handleToggleSaved(item.id)}
             />
           )}
           contentContainerStyle={styles.list}

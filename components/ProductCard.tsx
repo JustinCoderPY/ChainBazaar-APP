@@ -16,6 +16,8 @@ interface Props {
   btcPrice: number;
   ethPrice: number;
   onPress: () => void;
+  isSaved?: boolean;
+  onToggleSaved?: () => void;
 }
 
 export default function ProductCard({
@@ -23,6 +25,8 @@ export default function ProductCard({
   btcPrice,
   ethPrice,
   onPress,
+  isSaved = false,
+  onToggleSaved,
 }: Props) {
   const btcAmount = (product.price / btcPrice).toFixed(6);
   const ethAmount = (product.price / ethPrice).toFixed(4);
@@ -54,6 +58,23 @@ export default function ProductCard({
               {product.imageUrls.length}
             </Text>
           </View>
+        )}
+
+        {onToggleSaved && (
+          <AnimatedPressable
+            style={styles.saveButton}
+            onPress={(event) => {
+              event.stopPropagation?.();
+              onToggleSaved();
+            }}
+            scaleValue={0.9}
+          >
+            <Ionicons
+              name={isSaved ? 'heart' : 'heart-outline'}
+              size={22}
+              color={isSaved ? '#FF9D9D' : AppColors.secondary}
+            />
+          </AnimatedPressable>
         )}
 
         {/* Category pill */}
@@ -144,7 +165,7 @@ const styles = StyleSheet.create({
   },
   imageBadge: {
     position: 'absolute',
-    top: Spacing.sm,
+    top: 52,
     right: Spacing.sm,
     flexDirection: 'row',
     alignItems: 'center',
@@ -158,6 +179,17 @@ const styles = StyleSheet.create({
     color: AppColors.secondary,
     fontSize: 11,
     fontWeight: '700',
+  },
+  saveButton: {
+    position: 'absolute',
+    top: Spacing.sm,
+    right: Spacing.sm,
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: AppColors.overlayLight,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   categoryPill: {
     position: 'absolute',
