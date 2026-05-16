@@ -91,7 +91,10 @@ export default function SavedScreen() {
         <Image source={{ uri: imageUrl }} style={[styles.cardImage, { height: cardWidth }]} resizeMode="cover" />
         <AnimatedPressable
           style={styles.heartButton}
-          onPress={() => handleUnsave(item.id)}
+          onPress={(event) => {
+            event.stopPropagation?.();
+            handleUnsave(item.id);
+          }}
           scaleValue={0.9}
         >
           <Ionicons name="heart" size={24} color="#FF9D9D" />

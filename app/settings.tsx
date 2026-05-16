@@ -68,14 +68,6 @@ export default function SettingsScreen() {
   const [loggingOut, setLoggingOut] = useState(false);
 
   // ─── Handlers ───────────────────────────────────────────────
-  const handleChangePhoto = () => {
-    Alert.alert(
-      'Change Profile Photo',
-      'This feature is coming soon. You will be able to upload a custom avatar.',
-      [{ text: 'OK' }]
-    );
-  };
-
   const handleChangePassword = () => {
     router.push('/account-settings' as any);
   };
@@ -128,14 +120,6 @@ export default function SettingsScreen() {
     {
       title: 'Account',
       items: [
-        {
-          id: 'photo',
-          icon: 'camera-outline',
-          iconColor: Colors.accent,
-          label: 'Change Profile Photo',
-          subtitle: 'Upload a custom avatar',
-          onPress: handleChangePhoto,
-        },
         {
           id: 'password',
           icon: 'lock-closed-outline',
