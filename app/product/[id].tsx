@@ -26,10 +26,10 @@ const LOGIN_ROUTE = '/auth/login';
 const HOME_ROUTE = '/';
 const MOBILE_IMAGE_MIN_HEIGHT = 260;
 const MOBILE_IMAGE_MAX_HEIGHT = 300;
-const WEB_DETAIL_MAX_WIDTH = 1040;
-const WEB_IMAGE_MAX_WIDTH = 600;
+const PRODUCT_DETAIL_MAX_WIDTH = 720;
+const WEB_IMAGE_MAX_WIDTH = 720;
 const WEB_IMAGE_MAX_HEIGHT = 400;
-const WEB_DETAIL_GAP = 28;
+const DESKTOP_BREAKPOINT = 900;
 
 const showAlert = (title: string, message: string) => {
   if (Platform.OS === 'web' && typeof window !== 'undefined') {
@@ -214,35 +214,21 @@ export default function ProductDetailsScreen() {
     product.imageUrls && product.imageUrls.length > 0
     ? product.imageUrls
     : ['https://picsum.photos/400'];
-  const isWideLayout = Platform.OS === 'web' || width >= 768;
-  const detailWidth = isWideLayout
-    ? Math.min(width - 48, WEB_DETAIL_MAX_WIDTH)
-    : width;
-  const imageWidth = isWideLayout
-    ? Math.min(detailWidth * 0.56, WEB_IMAGE_MAX_WIDTH)
+  const isDesktopLayout = width >= DESKTOP_BREAKPOINT;
+  const detailWidth = isDesktopLayout
+    ? Math.min(width - 48, PRODUCT_DETAIL_MAX_WIDTH)
     : Math.max(width - 24, 0);
-  const imageHeight = isWideLayout
-    ? Math.min(Math.max(imageWidth * 0.64, 340), WEB_IMAGE_MAX_HEIGHT)
+  const imageWidth = Math.min(detailWidth, WEB_IMAGE_MAX_WIDTH);
+  const imageHeight = isDesktopLayout
+    ? Math.min(Math.max(imageWidth * 0.54, 360), WEB_IMAGE_MAX_HEIGHT)
     : Math.min(Math.max(width * 0.74, MOBILE_IMAGE_MIN_HEIGHT), MOBILE_IMAGE_MAX_HEIGHT);
-  const contentWidth = isWideLayout
-    ? Math.max(detailWidth - imageWidth - WEB_DETAIL_GAP, 320)
-    : imageWidth;
 
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView showsVerticalScrollIndicator={false}>
-        <View
-          style={[
-            styles.detailShell,
-            {
-              width: detailWidth,
-              flexDirection: isWideLayout ? 'row' : 'column',
-              gap: isWideLayout ? WEB_DETAIL_GAP : 0,
-            },
-          ]}
-        >
-          <View style={[styles.mediaColumn, { width: imageWidth }]}>
-            {/* ── Back + Share Bar ─────────────────────────────── */}
+        <View style={[styles.detailShell, { width: detailWidth }]}>
+          {/* ── Image Carousel ──────────────────────────────── */}
+          <View style={[styles.carouselFrame, { width: imageWidth, height: imageHeight }]}>
             <View style={[styles.topBar, { width: imageWidth }]}>
               <AnimatedPressable style={styles.backButton} onPress={handleBack}>
                 <Ionicons name="arrow-back" size={24} color={Colors.secondary} />
@@ -252,52 +238,43 @@ export default function ProductDetailsScreen() {
               </AnimatedPressable>
             </View>
 
-            {/* ── Image Carousel ──────────────────────────────── */}
-            <View style={[styles.carouselFrame, { width: imageWidth, height: imageHeight }]}>
-              <ScrollView
-                horizontal
-                pagingEnabled
-                showsHorizontalScrollIndicator={false}
-                style={styles.carouselScroller}
-                onMomentumScrollEnd={(e) => {
-                  const index = Math.round(e.nativeEvent.contentOffset.x / imageWidth);
-                  setCurrentImageIndex(index);
-                }}
-              >
-                {images.map((url, index) => (
-                  <Image
-                    key={index}
-                    source={{ uri: url }}
-                    style={[styles.image, { width: imageWidth, height: imageHeight }]}
-                    resizeMode="contain"
-                  />
-                ))}
-              </ScrollView>
-            </View>
-
-            {/* Page Dots */}
-            {images.length > 1 && (
-              <View style={styles.dotsContainer}>
-                {images.map((_, index) => (
-                  <View
-                    key={index}
-                    style={[
-                      styles.dot,
-                      index === currentImageIndex && styles.activeDot,
-                    ]}
-                  />
-                ))}
-              </View>
-            )}
+            <ScrollView
+              horizontal
+              pagingEnabled
+              showsHorizontalScrollIndicator={false}
+              style={styles.carouselScroller}
+              onMomentumScrollEnd={(e) => {
+                const index = Math.round(e.nativeEvent.contentOffset.x / imageWidth);
+                setCurrentImageIndex(index);
+              }}
+            >
+              {images.map((url, index) => (
+                <Image
+                  key={index}
+                  source={{ uri: url }}
+                  style={[styles.image, { width: imageWidth, height: imageHeight }]}
+                  resizeMode="cover"
+                />
+              ))}
+            </ScrollView>
           </View>
 
-          <View
-            style={[
-              styles.content,
-              isWideLayout && styles.contentCard,
-              { width: contentWidth },
-            ]}
-          >
+          {/* Page Dots */}
+          {images.length > 1 && (
+            <View style={styles.dotsContainer}>
+              {images.map((_, index) => (
+                <View
+                  key={index}
+                  style={[
+                    styles.dot,
+                    index === currentImageIndex && styles.activeDot,
+                  ]}
+                />
+              ))}
+            </View>
+          )}
+
+          <View style={[styles.content, { width: detailWidth }]}>
             <View style={styles.categoryBadge}>
               <Text style={styles.categoryText}>{product.category}</Text>
             </View>
@@ -386,12 +363,8 @@ const styles = StyleSheet.create({
   },
   detailShell: {
     alignSelf: 'center',
-    paddingHorizontal: 12,
-    paddingTop: 18,
+    paddingTop: 12,
     paddingBottom: 28,
-  },
-  mediaColumn: {
-    alignSelf: 'center',
   },
   backButton: {
     width: 40,
@@ -444,14 +417,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 0,
     paddingTop: 12,
     paddingBottom: 20,
-  },
-  contentCard: {
-    alignSelf: 'flex-start',
-    backgroundColor: '#121212',
-    borderRadius: Radii.md,
-    borderWidth: 1,
-    borderColor: '#222',
-    padding: 22,
   },
   categoryBadge: {
     alignSelf: 'flex-start',
