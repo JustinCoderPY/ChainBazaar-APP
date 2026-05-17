@@ -1,5 +1,12 @@
 import React from 'react';
-import { View, Text, Image, StyleSheet } from 'react-native';
+import {
+  GestureResponderEvent,
+  Image,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Product } from '../types';
 import {
@@ -36,10 +43,14 @@ export default function ProductCard({
       ? product.imageUrls[0]
       : 'https://picsum.photos/300';
 
-  const handleToggleSaved = (event: any) => {
+  const stopCardPress = (event: GestureResponderEvent) => {
     event?.preventDefault?.();
     event?.stopPropagation?.();
-    event?.nativeEvent?.stopImmediatePropagation?.();
+    (event?.nativeEvent as { stopImmediatePropagation?: () => void })?.stopImmediatePropagation?.();
+  };
+
+  const handleToggleSaved = (event: GestureResponderEvent) => {
+    stopCardPress(event);
     onToggleSaved?.();
   };
 
@@ -78,21 +89,21 @@ export default function ProductCard({
         </AnimatedPressable>
 
         {onToggleSaved && (
-          <AnimatedPressable
+          <Pressable
             style={styles.saveButton}
             onPress={handleToggleSaved}
-            onPressIn={(event) => {
-              event?.preventDefault?.();
-              event?.stopPropagation?.();
-            }}
-            scaleValue={0.9}
+            onPressIn={stopCardPress}
+            onPressOut={stopCardPress}
+            hitSlop={12}
+            accessibilityRole="button"
+            accessibilityLabel={isSaved ? 'Unsave listing' : 'Save listing'}
           >
             <Ionicons
               name={isSaved ? 'heart' : 'heart-outline'}
               size={22}
               color={isSaved ? '#FF9D9D' : AppColors.secondary}
             />
-          </AnimatedPressable>
+          </Pressable>
         )}
       </View>
 
@@ -202,6 +213,8 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: Spacing.sm,
     right: Spacing.sm,
+    zIndex: 50,
+    elevation: 50,
     width: 38,
     height: 38,
     borderRadius: 19,
