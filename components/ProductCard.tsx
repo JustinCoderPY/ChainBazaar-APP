@@ -36,36 +36,54 @@ export default function ProductCard({
       ? product.imageUrls[0]
       : 'https://picsum.photos/300';
 
+  const handleToggleSaved = (event: any) => {
+    event?.preventDefault?.();
+    event?.stopPropagation?.();
+    event?.nativeEvent?.stopImmediatePropagation?.();
+    onToggleSaved?.();
+  };
+
   return (
-    <AnimatedPressable
-      style={styles.card}
-      onPress={onPress}
-      scaleValue={0.975}
-    >
+    <View style={styles.card}>
       {/* ── Image ──────────────────────────────────────────── */}
       <View style={styles.imageWrapper}>
-        <Image
-          source={{ uri: imageUrl }}
-          style={styles.image}
-          resizeMode="cover"
-        />
+        <AnimatedPressable
+          style={styles.pressArea}
+          onPress={onPress}
+          scaleValue={0.985}
+        >
+          <Image
+            source={{ uri: imageUrl }}
+            style={styles.image}
+            resizeMode="cover"
+          />
 
-        {/* Image count badge */}
-        {product.imageUrls && product.imageUrls.length > 1 && (
-          <View style={styles.imageBadge}>
-            <Ionicons name="images-outline" size={11} color={AppColors.secondary} />
-            <Text style={styles.imageBadgeText}>
-              {product.imageUrls.length}
-            </Text>
+          {/* Image count badge */}
+          {product.imageUrls && product.imageUrls.length > 1 && (
+            <View style={styles.imageBadge}>
+              <Ionicons name="images-outline" size={11} color={AppColors.secondary} />
+              <Text style={styles.imageBadgeText}>
+                {product.imageUrls.length}
+              </Text>
+            </View>
+          )}
+
+          {/* Category pill */}
+          <View style={styles.categoryPill}>
+            <Text style={styles.categoryText}>{product.category}</Text>
           </View>
-        )}
+
+          {/* Bottom gradient overlay for text readability */}
+          <View style={styles.imageGradient} />
+        </AnimatedPressable>
 
         {onToggleSaved && (
           <AnimatedPressable
             style={styles.saveButton}
-            onPress={(event) => {
-              event.stopPropagation?.();
-              onToggleSaved();
+            onPress={handleToggleSaved}
+            onPressIn={(event) => {
+              event?.preventDefault?.();
+              event?.stopPropagation?.();
             }}
             scaleValue={0.9}
           >
@@ -76,18 +94,14 @@ export default function ProductCard({
             />
           </AnimatedPressable>
         )}
-
-        {/* Category pill */}
-        <View style={styles.categoryPill}>
-          <Text style={styles.categoryText}>{product.category}</Text>
-        </View>
-
-        {/* Bottom gradient overlay for text readability */}
-        <View style={styles.imageGradient} />
       </View>
 
       {/* ── Content ────────────────────────────────────────── */}
-      <View style={styles.content}>
+      <AnimatedPressable
+        style={styles.content}
+        onPress={onPress}
+        scaleValue={0.985}
+      >
         {/* Title */}
         <Text style={styles.title} numberOfLines={1}>
           {product.title}
@@ -128,8 +142,8 @@ export default function ProductCard({
           </View>
           <Ionicons name="chevron-forward" size={16} color={AppColors.textDim} />
         </View>
-      </View>
-    </AnimatedPressable>
+      </AnimatedPressable>
+    </View>
   );
 }
 
@@ -146,6 +160,10 @@ const styles = StyleSheet.create({
 
   // ── Image ──
   imageWrapper: {
+    position: 'relative',
+  },
+  pressArea: {
+    width: '100%',
     position: 'relative',
   },
   image: {

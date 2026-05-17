@@ -8,7 +8,6 @@ import { Colors } from '@/constants/Colors';
 // Tab name      Active icon              Inactive icon
 // ──────────    ────────────────         ────────────────
 // Explore       compass                  compass-outline
-// Saved         heart                    heart-outline
 // Sell          add-circle               add-circle-outline
 // Messages      chatbubbles              chatbubbles-outline
 // Profile       person-circle            person-circle-outline
@@ -17,7 +16,6 @@ type IoniconsName = keyof typeof Ionicons.glyphMap;
 
 const TAB_ICONS: Record<string, { active: IoniconsName; inactive: IoniconsName }> = {
   index:    { active: 'compass',         inactive: 'compass-outline' },
-  saved:    { active: 'heart',           inactive: 'heart-outline' },
   create:   { active: 'add-circle',      inactive: 'add-circle-outline' },
   messages: { active: 'chatbubbles',     inactive: 'chatbubbles-outline' },
   profile:  { active: 'person-circle',   inactive: 'person-circle-outline' },
@@ -48,12 +46,6 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
-        name="saved"
-        options={{
-          title: 'Saved',
-        }}
-      />
-      <Tabs.Screen
         name="create"
         options={{
           title: 'Sell',
@@ -69,6 +61,12 @@ export default function TabLayout() {
         name="profile"
         options={{
           title: 'Profile',
+        }}
+      />
+      <Tabs.Screen
+        name="saved"
+        options={{
+          href: null,
         }}
       />
       {/* Hide the old explore tab from the Expo template */}

@@ -2,6 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
 import {
+  Alert,
   FlatList,
   Image,
   RefreshControl,
@@ -15,13 +16,13 @@ import AnimatedPressable from '../../components/AnimatedPressable';
 import { Colors } from '../../constants/Colors';
 import { Radii, Shadows, Spacing } from '../../constants/theme';
 import { useAuth } from '../../context/AuthContext';
-import { getSavedListings, getUserListings } from '../../services/firebaseService';
+import { getSavedListings, getUserListings, unsaveListingForUser } from '../../services/firebaseService';
 import { Product } from '../../types';
 
 type ProfileSection = 'listings' | 'saved';
 
 const GRID_GAP = 10;
-const PROFILE_MAX_WIDTH = 860;
+const PROFILE_MAX_WIDTH = 620;
 const SOLD_PLACEHOLDER = 0;
 
 export default function ProfileScreen() {
@@ -35,7 +36,7 @@ export default function ProfileScreen() {
 
   const contentWidth = Math.min(width - 24, PROFILE_MAX_WIDTH);
   const cardWidth = (contentWidth - GRID_GAP) / 2;
-  const cardImageHeight = Math.min(Math.max(cardWidth * 0.86, 138), 190);
+  const cardImageHeight = Math.min(Math.max(cardWidth * 0.84, 132), 172);
 
   const loadProfileData = useCallback(async () => {
     if (!user?.id || isGuest) {
@@ -77,6 +78,29 @@ export default function ProfileScreen() {
 
   const activeData = activeSection === 'listings' ? myListings : savedListings;
 
+  const handleAvatarEdit = useCallback(() => {
+    Alert.alert('Coming Soon', 'Change profile photo coming soon.');
+  }, []);
+
+  const handleUnsave = useCallback(async (productId: string) => {
+    if (!user?.id) return;
+
+    setSavedListings((current) => current.filter((item) => item.id !== productId));
+
+    try {
+      await unsaveListingForUser(user.id, productId);
+    } catch (error) {
+      console.error('Error removing saved listing:', error);
+      await loadProfileData();
+    }
+  }, [loadProfileData, user?.id]);
+
+  const stopCardPress = (event: any) => {
+    event?.preventDefault?.();
+    event?.stopPropagation?.();
+    event?.nativeEvent?.stopImmediatePropagation?.();
+  };
+
   const renderProductTile = ({ item }: { item: Product }) => {
     const imageUrl =
       item.imageUrls && item.imageUrls.length > 0
@@ -84,23 +108,44 @@ export default function ProfileScreen() {
         : 'https://picsum.photos/400';
 
     return (
-      <AnimatedPressable
+      <View
         style={[styles.gridCard, { width: cardWidth }]}
-        onPress={() => router.push(`/product/${item.id}`)}
-        scaleValue={0.97}
       >
-        <Image
-          source={{ uri: imageUrl }}
-          style={[styles.gridImage, { height: cardImageHeight }]}
-          resizeMode="cover"
-        />
-        <View style={styles.gridInfo}>
+        <AnimatedPressable
+          style={styles.gridImagePress}
+          onPress={() => router.push(`/product/${item.id}`)}
+          scaleValue={0.98}
+        >
+          <Image
+            source={{ uri: imageUrl }}
+            style={[styles.gridImage, { height: cardImageHeight }]}
+            resizeMode="cover"
+          />
+        </AnimatedPressable>
+        {activeSection === 'saved' && (
+          <AnimatedPressable
+            style={styles.savedHeartButton}
+            onPress={(event) => {
+              stopCardPress(event);
+              handleUnsave(item.id);
+            }}
+            onPressIn={stopCardPress}
+            scaleValue={0.9}
+          >
+            <Ionicons name="heart" size={20} color="#FF9D9D" />
+          </AnimatedPressable>
+        )}
+        <AnimatedPressable
+          style={styles.gridInfo}
+          onPress={() => router.push(`/product/${item.id}`)}
+          scaleValue={0.98}
+        >
           <Text style={styles.gridTitle} numberOfLines={1}>
             {item.title}
           </Text>
           <Text style={styles.gridPrice}>${Number(item.price).toFixed(2)}</Text>
-        </View>
-      </AnimatedPressable>
+        </AnimatedPressable>
+      </View>
     );
   };
 
@@ -119,12 +164,16 @@ export default function ProfileScreen() {
       </View>
 
       <View style={styles.identityRow}>
-        <View style={styles.avatar}>
+        <AnimatedPressable
+          style={styles.avatar}
+          onPress={handleAvatarEdit}
+          scaleValue={0.96}
+        >
           <Text style={styles.avatarText}>{initials}</Text>
           <View style={styles.avatarEditBadge}>
             <Ionicons name="add" size={18} color="#0D0D0D" />
           </View>
-        </View>
+        </AnimatedPressable>
 
         <View style={styles.statsRow}>
           <View style={styles.statItem}>
@@ -151,10 +200,14 @@ export default function ProfileScreen() {
           <Ionicons name="cube-outline" size={17} color="#C7CCD6" />
           <Text style={styles.actionPillText}>{myListings.length} active</Text>
         </View>
-        <View style={styles.actionPill}>
+        <AnimatedPressable
+          style={styles.actionPill}
+          onPress={() => setActiveSection('saved')}
+          scaleValue={0.96}
+        >
           <Ionicons name="heart-outline" size={17} color="#C7CCD6" />
           <Text style={styles.actionPillText}>{savedListings.length} saved</Text>
-        </View>
+        </AnimatedPressable>
       </View>
 
       <View style={styles.sectionTabs}>
@@ -176,15 +229,6 @@ export default function ProfileScreen() {
             Saved
           </Text>
         </AnimatedPressable>
-      </View>
-
-      <View style={styles.gridHeader}>
-        <Text style={styles.gridHeaderTitle}>
-          {activeSection === 'listings'
-            ? `Active (${myListings.length})`
-            : `Saved (${savedListings.length})`}
-        </Text>
-        <Ionicons name="options-outline" size={22} color="#C7CCD6" />
       </View>
     </View>
   );
@@ -309,7 +353,7 @@ const styles = StyleSheet.create({
   profileHeader: {
     alignSelf: 'center',
     paddingTop: 18,
-    paddingBottom: 10,
+    paddingBottom: 8,
   },
   topBar: {
     flexDirection: 'row',
@@ -409,7 +453,7 @@ const styles = StyleSheet.create({
   profileActions: {
     flexDirection: 'row',
     gap: 10,
-    marginBottom: 18,
+    marginBottom: 16,
   },
   actionPill: {
     flexDirection: 'row',
@@ -429,40 +473,26 @@ const styles = StyleSheet.create({
   },
   sectionTabs: {
     flexDirection: 'row',
-    backgroundColor: '#161616',
-    borderRadius: Radii.md,
-    borderWidth: 1,
-    borderColor: '#2A2A2A',
-    padding: 4,
-    marginBottom: 18,
+    alignItems: 'center',
+    gap: 30,
+    marginBottom: 12,
   },
   sectionTab: {
-    flex: 1,
     alignItems: 'center',
-    paddingVertical: 11,
-    borderRadius: Radii.sm,
+    paddingBottom: 8,
+    borderBottomWidth: 2,
+    borderBottomColor: 'transparent',
   },
   sectionTabActive: {
-    backgroundColor: Colors.accent,
+    borderBottomColor: Colors.accent,
   },
   sectionTabText: {
     color: '#C7CCD6',
-    fontSize: 15,
+    fontSize: 16,
     fontWeight: '800',
   },
   sectionTabTextActive: {
-    color: Colors.secondary,
-  },
-  gridHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingBottom: 12,
-  },
-  gridHeaderTitle: {
-    fontSize: 20,
-    fontWeight: '800',
-    color: Colors.secondary,
+    color: Colors.accent,
   },
   gridRow: {
     justifyContent: 'space-between',
@@ -470,18 +500,32 @@ const styles = StyleSheet.create({
   },
   gridCard: {
     backgroundColor: '#161616',
-    borderRadius: Radii.md,
+    borderRadius: Radii.sm,
     borderWidth: 1,
     borderColor: '#2A2A2A',
     overflow: 'hidden',
+  },
+  gridImagePress: {
+    width: '100%',
   },
   gridImage: {
     width: '100%',
     backgroundColor: '#1A1A1A',
   },
+  savedHeartButton: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   gridInfo: {
     paddingHorizontal: 10,
-    paddingVertical: 9,
+    paddingVertical: 8,
   },
   gridTitle: {
     fontSize: 13,
